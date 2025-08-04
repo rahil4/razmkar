@@ -1,0 +1,29 @@
+{# This is razmkar create template #}
+
+{% extends 'base.html' %}
+
+{% block content %}
+  <h2>افزودن رزمکار برای پروژه: {{ project.goal }}</h2>
+
+  <form method="POST">
+    {{ form.hidden_tag() }}
+
+    <div class="mb-3">
+      {{ form.mission.label }} {{ form.mission(class="form-control") }}
+    </div>
+    
+    <div class="mb-3">
+      {{ form.note.label }} {{ form.note(class="form-control") }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.due_date.label }} {{ form.due_date(class="form-control") }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.status.label }} {{ form.status(class="form-control") }}
+    </div>
+
+    <button type="submit" class="btn btn-primary">ثبت</button>
+  </form>
+{% endblock %}

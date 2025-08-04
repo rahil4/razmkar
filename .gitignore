@@ -1,0 +1,51 @@
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyw
+*.pyc
+
+# 🛠 محیط مجازی
+.venv/
+venv/
+ENV/
+env/
+
+# 🗂 فایل‌های سیستم ویندوز
+*.py:Zone.Identifier
+Thumbs.db
+Desktop.ini
+
+# 🌐 VSCode
+.vscode/
+
+# 🔐 فایل‌های کانفیگ خصوصی یا محلی
+instance/
+*.env
+*.local
+*.log
+
+# 📦 بسته‌های پایتون دانلود شده
+*.egg-info/
+dist/
+build/
+
+# 📷 کش‌های Flask یا Debugger
+*.db
+*.sqlite3
+*.log
+*.pot
+*.mo
+
+# 🧪 پوشه‌های تست یا coverage
+htmlcov/
+.tox/
+.coverage
+.cache/
+
+# 🌍 فایل‌های PyCharm
+.idea/
+
+# 🔄 فایل‌های Alembic
+migrations/versions/*.pyc

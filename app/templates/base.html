@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}عنوان صفحه{% endblock %}</title>
+
+  <!-- فونت محلی Vazirmatn با همه وزن‌ها -->
+  <style>
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Thin.woff2') }}") format('woff2');
+      font-weight: 100;
+    }
+
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url("{{ url_for('static', filename='fonts/Vazirmatn-ExtraLight.woff2') }}") format('woff2');
+      font-weight: 200;
+    }
+
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Light.woff2') }}") format('woff2');
+      font-weight: 300;
+    }
+
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Regular.woff2') }}") format('woff2');
+      font-weight: 400;
+    }
+
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Medium.woff2') }}") format('woff2');
+      font-weight: 500;
+    }
+
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url("{{ url_for('static', filename='fonts/Vazirmatn-SemiBold.woff2') }}") format('woff2');
+      font-weight: 600;
+    }
+
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Bold.woff2') }}") format('woff2');
+      font-weight: 700;
+    }
+
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url("{{ url_for('static', filename='fonts/Vazirmatn-ExtraBold.woff2') }}") format('woff2');
+      font-weight: 800;
+    }
+
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Black.woff2') }}") format('woff2');
+      font-weight: 900;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 1rem;
+      font-family: 'Vazirmatn', sans-serif;
+      font-weight: 400;
+      background-color: #f9f9f9;
+      color: #222;
+    }
+    button,
+    input,
+    select,
+    textarea {
+      font-family: 'Vazirmatn', sans-serif;
+      font-weight: inherit;
+}
+    header {
+      margin-bottom: 2rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #ddd;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    main {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 0 1rem;
+    }
+
+    @media (min-width: 768px) {
+      main {
+        max-width: 900px;
+      }
+    }
+
+        /* استایل پاپ‌آپ عمومی */
+    .popup-overlay {
+      position: fixed;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .popup {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+
+  </style>
+
+  {% block styles %}{% endblock %}
+</head>
+<body>
+
+  <header>
+    <h1>{% block header %}مدیریت پروژه{% endblock %}</h1>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

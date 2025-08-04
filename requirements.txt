@@ -1,0 +1,7 @@
+Flask
+Flask-WTF
+WTForms
+Flask-SQLAlchemy
+Werkzeug
+jdatetime
+python-dateutil

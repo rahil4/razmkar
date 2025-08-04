@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}جزئیات پروژه{% endblock %}
+
+{% block header %}جزئیات پروژه{% endblock %}
+
+{% block content %}
+  <section>
+    <h2>{{ project.client_name }} - {{ project.goal }}</h2>
+    <p>{{ project.status.value }}</p>
+    <span>{{ project.created_at | time_since | to_persian_number }}</span>
+    <br>
+    <button onclick="openEditPopup()">✏️ ویرایش پروژه</button>
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>رزمکارها</h3>
+    <ul>
+      {% for razmkar in project.razmkars if razmkar.parent_id is none %}
+        {% include 'razmkar/_tree.html' with context %}
+      {% endfor %}
+    </ul>
+    <button onclick="openRazmkarPopup()">➕ افزودن ماموریت</button>
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>لاگ‌ها</h3>
+    <ul id="logs-list">
+      {% for log in project.logs %}
+        <li>
+          <strong>{{ log.created_at | to_jalali_with_time }}</strong> –
+          {{ log.type }} –
+          {{ log.note }} (ثبت‌کننده: {{ log.created_by }})
+        </li>
+      {% else %}
+        <li>هنوز لاگی ثبت نشده است.</li>
+      {% endfor %}
+    </ul>
+    <button onclick="openLogPopup()">➕ افزودن لاگ</button>
+  </section>
+
+  <!-- پاپ‌آپ افزودن ماموریت -->
+  <div id="razmkar-popup" class="popup-overlay" style="display:none;">
+    <div class="popup">
+      <h3>افزودن ماموریت جدید</h3>
+      <form id="razmkar-form">
+        <input type="hidden" name="project_id" value="{{ project.id }}">
+        <input name="mission" placeholder="شرح ماموریت" required><br>
+        <textarea name="note" placeholder="توضیحات"></textarea><br>
+        <input name="due_date" type="date"><br>
+        <select name="status" required>
+          <option value="">وضعیت ماموریت</option>
+          <option value="pending">پیش‌نویس</option>
+          <option value="in_progress">در حال انجام</option>
+          <option value="done">انجام شده</option>
+          <option value="cancelled">لغو</option>
+        </select><br>
+        <button type="submit">ذخیره</button>
+        <button type="button" onclick="closeRazmkarPopup()">لغو</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- پاپ‌آپ ویرایش پروژه -->
+  <div id="edit-project-popup" class="popup-overlay" style="display:none;">
+    <div class="popup">
+      <h3>ویرایش پروژه</h3>
+      <form id="edit-project-form">
+        <input type="hidden" name="project_id" value="{{ project.id }}">
+        <input name="client_name" value="{{ project.client_name }}" placeholder="نام کارفرما" required><br>
+        <input name="goal" value="{{ project.goal }}" placeholder="هدف پروژه" required><br>
+        <select name="status" required>
+          <option value="draft" {% if project.status.name == 'draft' %}selected{% endif %}>پیش‌نویس</option>
+          <option value="active" {% if project.status.name == 'active' %}selected{% endif %}>فعال</option>
+          <option value="waiting" {% if project.status.name == 'waiting' %}selected{% endif %}>در انتظار</option>
+          <option value="completed" {% if project.status.name == 'completed' %}selected{% endif %}>اتمام</option>
+          <option value="cancelled" {% if project.status.name == 'cancelled' %}selected{% endif %}>لغو</option>
+        </select><br>
+        <button type="submit">ذخیره تغییرات</button>
+        <button type="button" onclick="deleteProject()" style="background:#c00;color:#fff;">🗑️ حذف پروژه</button>
+        <button type="button" onclick="closeEditPopup()">لغو</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function openRazmkarPopup() {
+    document.getElementById('razmkar-popup').style.display = 'flex';
+  }
+  function closeRazmkarPopup() {
+    document.getElementById('razmkar-popup').style.display = 'none';
+  }
+  document.getElementById('razmkar-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      const response = await fetch("/razmkar/create", {
+        method: "POST",
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (response.ok) {
+        alert('✅ ماموریت با موفقیت افزوده شد');
+        location.reload();
+      } else {
+        const text = await response.text();
+        alert('❌ خطا: ' + text);
+      }
+    } catch (err) {
+      alert('❌ خطای شبکه یا سرور');
+      console.error(err);
+    }
+  });
+
+  function openEditPopup() {
+    document.getElementById('edit-project-popup').style.display = 'flex';
+  }
+  function closeEditPopup() {
+    document.getElementById('edit-project-popup').style.display = 'none';
+  }
+  document.getElementById('edit-project-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      const response = await fetch(`/projects/{{ project.id }}/edit`, {
+        method: "POST",
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (response.ok) {
+        alert("✅ تغییرات ذخیره شد");
+        location.reload();
+      } else {
+        const error = await response.text();
+        alert("❌ خطا: " + error);
+      }
+    } catch (err) {
+      alert("❌ خطای شبکه یا سرور");
+      console.error(err);
+    }
+  });
+
+  async function deleteProject() {
+    if (!confirm("آیا از حذف این پروژه مطمئن هستید؟")) return;
+    try {
+      const response = await fetch(`/projects/{{ project.id }}/delete`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (response.ok) {
+        alert("✅ پروژه حذف شد");
+        window.location.href = "/projects";
+      } else {
+        const text = await response.text();
+        alert("❌ خطا: " + text);
+      }
+    } catch (err) {
+      alert("❌ خطای شبکه یا سرور");
+    }
+  }
+</script>
+{% endblock %}

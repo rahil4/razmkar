@@ -1,0 +1,20 @@
+<li>
+  <div>
+    <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=razmkar.id) }}">
+      <strong>{{ razmkar.mission }}</strong>
+    </a>
+    {% if razmkar.due_date %}
+      – <span>{{ razmkar.due_date | to_jalali | to_persian_number }}</span>
+    {% endif %}
+    – <span>{{ razmkar.status.value }}</span>
+  </div>
+
+  {% if razmkar.children %}
+    <ul>
+      {% for child in razmkar.children %}
+        {% set razmkar = child %}
+        {% include 'razmkar/_tree.html' with context %}
+      {% endfor %}
+    </ul>
+  {% endif %}
+</li>

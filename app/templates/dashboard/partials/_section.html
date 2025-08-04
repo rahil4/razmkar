@@ -1,0 +1,24 @@
+{% macro render_razmkar_list(title, items) %}
+<div class="col-12 col-md-6 col-lg-4">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">{{ title }}</h5>
+    </div>
+    <ul class="list-group list-group-flush">
+      {% for item in items %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ item.mission }}</span>
+          <small class="text-muted">{{ item.due_date.strftime('%Y-%m-%d') }}</small>
+        </li>
+      {% else %}
+        <li class="list-group-item text-muted text-center">موردی یافت نشد</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endmacro %}
+
+{{ render_razmkar_list('امروز', today_list) }}
+{{ render_razmkar_list('فردا', tomorrow_list) }}
+{{ render_razmkar_list('این هفته', week_list) }}
+{{ render_razmkar_list('گذشته', overdue_list) }}

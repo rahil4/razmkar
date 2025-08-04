@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}پروژه‌ها{% endblock %}
+{% block header %}فهرست پروژه‌ها{% endblock %}
+
+{% block content %}
+  <button onclick="openPopup()" style="margin-bottom: 1rem;">➕ افزودن پروژه</button>
+
+  <table class="project-list">
+    <thead>
+      <tr>
+        <th>عنوان پروژه</th>
+        <th>وضعیت</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for project in projects %}
+      <tr>
+        <td>
+          <a href="{{ url_for('projects.project_detail', project_id=project.id) }}" class="project-link">
+            {{ project.client_name | persian_digits }} - {{ project.goal | persian_digits }}
+          </a>
+        </td>
+        <td>{{ project.status.value | persian_digits }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- پاپ‌آپ افزودن پروژه -->
+  <div id="popup-overlay" class="popup-overlay" style="display:none;">
+    <div class="popup">
+      <h3>افزودن پروژه جدید</h3>
+      <form id="project-form">
+        <input name="client_name" placeholder="نام کارفرما" required><br>
+        <input name="goal" placeholder="هدف پروژه" required><br>
+        <select name="status">
+          <option value="draft">پیش‌نویس</option>
+          <option value="active">فعال</option>
+          <option value="waiting">در انتظار</option>
+          <option value="completed">اتمام</option>
+          <option value="cancelled">لغو</option>
+        </select><br>
+        <button type="submit">ذخیره</button>
+        <button type="button" onclick="closePopup()">لغو</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block styles %}
+  <style>
+    .project-list {
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      border-collapse: collapse;
+      font-size: 1rem;
+    }
+
+    .project-list th,
+    .project-list td {
+      padding: 0.75rem 1rem;
+      text-align: right;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .project-list thead {
+      background-color: #f3f3f3;
+    }
+
+    .project-list tbody tr:hover {
+      background-color: #e8f0ff;
+    }
+
+    .project-link {
+      text-decoration: none;
+      color: #222;
+      font-weight: 500;
+      display: inline-block;
+      width: 100%;
+    }
+
+    .project-link:hover {
+      color: #0077cc;
+    }
+
+    /* پاپ‌آپ */
+    .popup-overlay {
+      position: fixed;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .popup {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+
+    input, select {
+      width: 100%;
+      margin: 0.5rem 0;
+      padding: 0.5rem;
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      margin-top: 1rem;
+    }
+  </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function openPopup() {
+    document.getElementById('popup-overlay').style.display = 'flex';
+  }
+
+  function closePopup() {
+    document.getElementById('popup-overlay').style.display = 'none';
+  }
+
+  document.getElementById('project-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+
+    const response = await fetch(window.location.href, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+
+    if (response.ok) {
+      alert('✅ پروژه با موفقیت افزوده شد');
+      location.reload();
+    } else {
+      const err = await response.text();
+      alert('❌ خطا: ' + err);
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,34 @@
+├── __init__.py
+├── app
+│   ├── __init__.py
+│   ├── dashboard
+│   │   ├── routes.py
+│   ├── extensions.py
+│   ├── projects
+│   │   ├── forms.py
+│   │   ├── models.py
+│   │   ├── routes.py
+│   ├── razmkar
+│   │   ├── __init__.py
+│   │   ├── forms.py
+│   │   ├── models.py
+│   │   ├── routes.py
+│   ├── templates
+│   │   ├── base.html
+│   │   ├── dashboard
+│   │   │   ├── index.html
+│   │   ├── projects
+│   │   │   ├── create.html
+│   │   │   ├── detail.html
+│   │   │   ├── list.html
+│   │   │   └── overview.html
+│   │   └── razmkar
+│   │       ├── create.html
+│   │       ├── detail.html
+│   │       ├── list.html
+├── instance
+│   ├── config.py
+│   ├── db.sqlite3
+├── requirements.txt
+├── run.py
+└── stracture.txt

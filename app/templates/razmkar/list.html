@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>رزم‌کارهای پروژه</h2>
+<a href="{{ url_for('razmkar.create_razmkar', project_id=project_id) }}" class="btn btn-primary mb-3">رزم‌کار جدید</a>
+
+{% macro render_razmkar_tree(razmkar, level=0) %}
+  <div style="margin-right: {{ level * 30 }}px;">
+    <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=razmkar.id) }}">
+      {{ razmkar.mission }} [{{ razmkar.status.name }}]
+    </a>
+    {% for child in razmkar.children %}
+      {{ render_razmkar_tree(child, level + 1) }}
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% for r in razmkars %}
+  {{ render_razmkar_tree(r) }}
+{% else %}
+  <p class="text-muted">هیچ رزم‌کاری ثبت نشده است.</p>
+{% endfor %}
+
+<a href="{{ url_for('projects.project_detail', project_id=project_id) }}" class="btn btn-secondary mt-4">بازگشت به پروژه</a>
+{% endblock %}

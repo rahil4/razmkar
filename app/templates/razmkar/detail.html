@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}جزئیات ماموریت{% endblock %}
+
+{% block header %}جزئیات ماموریت{% endblock %}
+
+{% block content %}
+  <section>
+    <h2>{{ razmkar.mission }}</h2>
+    <p>{{ razmkar.note or "توضیحی وارد نشده" }}</p>
+    <p>
+      وضعیت: <strong>{{ razmkar.status.value }}</strong><br>
+      {% if razmkar.due_date %}
+        تاریخ انجام: {{ razmkar.due_date | to_jalali | to_persian_number }}<br>
+      {% endif %}
+      ایجاد شده: {{ razmkar.created_at | time_since | to_persian_number }}
+    </p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>لاگ‌های ماموریت</h3>
+    <ul>
+      {% for log in razmkar.logs %}
+        <li>
+          <strong>{{ log.created_at | to_jalali_with_time }}</strong> – 
+          {{ log.type }} – 
+          {{ log.content or "" }} 
+          {% if log.created_by %}(ثبت‌کننده: {{ log.created_by }}){% endif %}
+        </li>
+      {% else %}
+        <li>هنوز لاگی ثبت نشده است.</li>
+      {% endfor %}
+    </ul>
+    <button onclick="openLogPopup()">➕ افزودن لاگ</button>
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>زیرماموریت‌ها</h3>
+    {% if razmkar.children %}
+      <ul>
+        {% for child in razmkar.children %}
+          <li>
+            <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=child.id) }}">
+              {{ child.mission }} – {{ child.status.value }}
+            </a>
+            {% if child.due_date %}
+              ({{ child.due_date | to_jalali | to_persian_number }})
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>زیرماموریتی ثبت نشده است.</p>
+    {% endif %}
+    <button onclick="openChildPopup()">➕ افزودن ماموریت زیرمجموعه</button>
+  </section>
+
+  <!-- پاپ‌آپ افزودن لاگ -->
+  <div id="log-popup" class="popup-overlay" style="display:none;">
+    <div class="popup">
+      <h3>افزودن لاگ جدید</h3>
+      <form id="log-form">
+        <input type="hidden" name="razmkar_id" value="{{ razmkar.id }}">
+        <textarea name="content" placeholder="محتوای لاگ..." required></textarea><br>
+        <input name="created_by" placeholder="ثبت‌کننده..."><br>
+        <select name="type" required>
+          <option value="">نوع لاگ</option>
+          <option value="note">یادداشت</option>
+          <option value="action">اقدام</option>
+          <option value="followup">پیگیری</option>
+          <option value="reminder">یادآوری</option>
+          <option value="status_change">تغییر وضعیت</option>
+          <option value="file_upload">بارگذاری فایل</option>
+        </select><br>
+        <button type="submit">ذخیره</button>
+        <button type="button" onclick="closeLogPopup()">لغو</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- پاپ‌آپ افزودن زیرماموریت -->
+  <div id="child-razmkar-popup" class="popup-overlay" style="display:none;">
+    <div class="popup">
+      <h3>افزودن ماموریت زیرمجموعه</h3>
+      <form id="child-razmkar-form">
+        <input type="hidden" name="project_id" value="{{ razmkar.project.id }}">
+        <input type="hidden" name="parent_id" value="{{ razmkar.id }}">
+        <input name="mission" placeholder="شرح ماموریت" required><br>
+        <textarea name="note" placeholder="توضیحات"></textarea><br>
+        <input name="due_date" type="date"><br>
+        <select name="status" required>
+          <option value="">وضعیت ماموریت</option>
+          <option value="pending">پیش‌نویس</option>
+          <option value="in_progress">در حال انجام</option>
+          <option value="done">انجام شده</option>
+          <option value="cancelled">لغو</option>
+        </select><br>
+        <button type="submit">ذخیره</button>
+        <button type="button" onclick="closeChildPopup()">لغو</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function openLogPopup() {
+    document.getElementById('log-popup').style.display = 'flex';
+  }
+
+  function closeLogPopup() {
+    document.getElementById('log-popup').style.display = 'none';
+  }
+
+  document.getElementById('log-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+
+    try {
+      const response = await fetch(window.location.href, {
+        method: "POST",
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+
+      if (response.ok) {
+        alert("✅ لاگ ثبت شد");
+        location.reload();
+      } else {
+        const err = await response.text();
+        alert("❌ خطا: " + err);
+      }
+    } catch (err) {
+      alert("❌ خطای شبکه");
+      console.error(err);
+    }
+  });
+
+  function openChildPopup() {
+    document.getElementById('child-razmkar-popup').style.display = 'flex';
+  }
+
+  function closeChildPopup() {
+    document.getElementById('child-razmkar-popup').style.display = 'none';
+  }
+
+  document.getElementById('child-razmkar-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      const response = await fetch("/razmkar/create", {
+        method: "POST",
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (response.ok) {
+        alert("✅ ماموریت زیرمجموعه ثبت شد");
+        location.reload();
+      } else {
+        const err = await response.text();
+        alert("❌ خطا: " + err);
+      }
+    } catch (err) {
+      alert("❌ خطای سرور یا شبکه");
+      console.error(err);
+    }
+  });
+</script>
+{% endblock %}
