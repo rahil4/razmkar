@@ -65,6 +65,27 @@
     </div>
   </div>
 
+  <!-- پاپ‌آپ افزودن لاگ پروژه -->
+  <div id="log-popup" class="popup-overlay" style="display:none;">
+    <div class="popup">
+      <h3>افزودن لاگ پروژه</h3>
+      <form id="log-form">
+        <input type="hidden" name="project_id" value="{{ project.id }}">
+        <textarea name="note" placeholder="توضیح لاگ..." required></textarea><br>
+        <input name="created_by" placeholder="ثبت‌کننده"><br>
+        <select name="type" required>
+          <option value="">نوع لاگ</option>
+          <option value="note">یادداشت</option>
+          <option value="meeting">جلسه</option>
+          <option value="update">به‌روزرسانی</option>
+          <option value="followup">پیگیری</option>
+        </select><br>
+        <button type="submit">ذخیره</button>
+        <button type="button" onclick="closeLogPopup()">لغو</button>
+      </form>
+    </div>
+  </div>
+
   <!-- پاپ‌آپ ویرایش پروژه -->
   <div id="edit-project-popup" class="popup-overlay" style="display:none;">
     <div class="popup">
@@ -96,6 +117,7 @@
   function closeRazmkarPopup() {
     document.getElementById('razmkar-popup').style.display = 'none';
   }
+
   document.getElementById('razmkar-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -118,12 +140,42 @@
     }
   });
 
+  function openLogPopup() {
+    document.getElementById('log-popup').style.display = 'flex';
+  }
+  function closeLogPopup() {
+    document.getElementById('log-popup').style.display = 'none';
+  }
+
+  document.getElementById('log-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      const response = await fetch(`/projects/{{ project.id }}/add-log`, {
+        method: "POST",
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (response.ok) {
+        alert("✅ لاگ ثبت شد");
+        location.reload();
+      } else {
+        const error = await response.text();
+        alert("❌ خطا: " + error);
+      }
+    } catch (err) {
+      alert("❌ خطای شبکه");
+      console.error(err);
+    }
+  });
+
   function openEditPopup() {
     document.getElementById('edit-project-popup').style.display = 'flex';
   }
   function closeEditPopup() {
     document.getElementById('edit-project-popup').style.display = 'none';
   }
+
   document.getElementById('edit-project-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
