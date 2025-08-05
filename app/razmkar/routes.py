@@ -66,7 +66,6 @@ def razmkar_tree(project_id):
 
 
 
-
 @razmkar_bp.route('/<int:razmkar_id>', methods=['GET', 'POST'])
 def razmkar_detail(razmkar_id):
     razmkar = Razmkar.query.get_or_404(razmkar_id)
@@ -94,6 +93,79 @@ def razmkar_detail(razmkar_id):
         except Exception as e:
             return f'❌ خطای داخلی: {e}', 500
 
-    # GET → نمایش صفحه جزئیات رزمکار
+    # گرفتن لاگ‌ها
     logs = RazmkarLog.query.filter_by(razmkar_id=razmkar.id).order_by(RazmkarLog.created_at.desc()).all()
-    return render_template('razmkar/detail.html', razmkar=razmkar, logs=logs)
+
+    # گرفتن مسیر والدها (breadcrumb)
+    def get_razmkar_ancestors(r):
+        ancestors = []
+        current = r.parent
+        while current:
+            ancestors.insert(0, current)
+            current = current.parent
+        return ancestors
+
+    ancestors = get_razmkar_ancestors(razmkar)
+
+    return render_template(
+        'razmkar/detail.html',
+        razmkar=razmkar,
+        logs=logs,
+        ancestors=ancestors
+    )
+
+
+@razmkar_bp.route('/<int:task_id>/update_status_ajax', methods=['POST'])
+def update_status_ajax(task_id):
+    task = Razmkar.query.get_or_404(task_id)
+    data = request.get_json()
+    new_status = data.get('status')
+
+    if new_status not in ['pending', 'in_progress', 'done', 'cancelled']:
+        return jsonify({'success': False, 'error': 'Invalid status'}), 400
+
+    task.status = new_status
+    db.session.commit()
+    return jsonify({'success': True})
+
+@razmkar_bp.route('/<int:razmkar_id>/edit', methods=['POST'])
+def edit_razmkar(razmkar_id):
+    razmkar = Razmkar.query.get_or_404(razmkar_id)
+
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return jsonify({'message': 'درخواست نامعتبر'}), 400
+
+    # دریافت اطلاعات
+    mission = request.form.get('mission')
+    note = request.form.get('note')
+    due_date = request.form.get('due_date')
+    status = request.form.get('status')
+
+    # اعتبارسنجی وضعیت
+    if status not in RazmkarStatus.__members__:
+        return jsonify({'message': 'وضعیت نامعتبر است'}), 400
+
+    # اعمال تغییرات
+    razmkar.mission = mission
+    razmkar.note = note
+
+    if due_date:
+        try:
+            razmkar.due_date = datetime.strptime(due_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'message': 'فرمت تاریخ نادرست است'}), 400
+    else:
+        razmkar.due_date = None
+
+    razmkar.status = RazmkarStatus[status]
+
+    db.session.commit()
+    return jsonify({'message': 'ماموریت با موفقیت ویرایش شد'})
+
+
+@razmkar_bp.route('/<int:razmkar_id>/delete', methods=['POST'])
+def delete_razmkar(razmkar_id):
+    razmkar = Razmkar.query.get_or_404(razmkar_id)
+    db.session.delete(razmkar)
+    db.session.commit()
+    return jsonify({'message': 'ماموریت حذف شد'})

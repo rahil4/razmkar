@@ -1,377 +1,131 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
-{% block title %}داشبورد - مدیریت پروژه{% endblock %}
+{% block title %}داشبورد{% endblock %}
+
+{% block header %}داشبورد{% endblock %}
 
 {% block content %}
-<!-- Header Section -->
-<div class="row mb-4">
-  <div class="col-12">
-    <div class="d-flex justify-content-between align-items-center">
-      <div>
-        <h1 class="text-gradient mb-2">
-          <i class="fas fa-tachometer-alt me-2"></i>
-          داشبورد مدیریت
-        </h1>
-        <p class="text-muted mb-0">خلاصه‌ای از وضعیت پروژه‌ها و رزمکارهای شما</p>
-      </div>
-      <div>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#quickAddModal">
-          <i class="fas fa-plus"></i>
-          افزودن سریع
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
+  <section>
+    <h2>پروژه‌های فعال</h2>
+    {% if active_projects %}
+      <ul>
+        {% for project in active_projects %}
+          <li>
+            <a href="{{ url_for('projects.project_detail', project_id=project.id) }}">
+              {{ project.client_name }} - {{ project.goal }}
+            </a>
+            {% if project.next_due %}
+              <span style="color:#999">({{ project.next_due | to_jalali | to_persian_number }})</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>پروژه فعالی یافت نشد.</p>
+    {% endif %}
+  </section>
 
-<!-- Statistics Cards -->
-<div class="row g-4 mb-5">
-  <div class="col-md-3 col-sm-6">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <div class="rounded-circle bg-danger bg-opacity-10 d-inline-flex align-items-center justify-content-center" 
-               style="width: 60px; height: 60px;">
-            <i class="fas fa-exclamation-triangle text-danger fa-2x"></i>
-          </div>
-        </div>
-        <h3 class="text-danger mb-1">{{ overdue_list|length }}</h3>
-        <p class="text-muted mb-0">عقب‌افتاده</p>
-      </div>
-    </div>
-  </div>
-  
-  <div class="col-md-3 col-sm-6">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <div class="rounded-circle bg-warning bg-opacity-10 d-inline-flex align-items-center justify-content-center" 
-               style="width: 60px; height: 60px;">
-            <i class="fas fa-calendar-day text-warning fa-2x"></i>
-          </div>
-        </div>
-        <h3 class="text-warning mb-1">{{ today_list|length }}</h3>
-        <p class="text-muted mb-0">امروز</p>
-      </div>
-    </div>
-  </div>
-  
-  <div class="col-md-3 col-sm-6">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <div class="rounded-circle bg-info bg-opacity-10 d-inline-flex align-items-center justify-content-center" 
-               style="width: 60px; height: 60px;">
-            <i class="fas fa-calendar-plus text-info fa-2x"></i>
-          </div>
-        </div>
-        <h3 class="text-info mb-1">{{ tomorrow_list|length }}</h3>
-        <p class="text-muted mb-0">فردا</p>
-      </div>
-    </div>
-  </div>
-  
-  <div class="col-md-3 col-sm-6">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <div class="rounded-circle bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center" 
-               style="width: 60px; height: 60px;">
-            <i class="fas fa-calendar-week text-primary fa-2x"></i>
-          </div>
-        </div>
-        <h3 class="text-primary mb-1">{{ week_list|length }}</h3>
-        <p class="text-muted mb-0">این هفته</p>
-      </div>
-    </div>
-  </div>
-</div>
+  <hr>
 
-<!-- Task Sections -->
-<div class="row g-4">
-  <!-- Overdue Tasks -->
-  {% if overdue_list %}
-  <div class="col-lg-6 col-12">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-header bg-danger bg-opacity-10 border-0 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 text-danger">
-          <i class="fas fa-exclamation-triangle me-2"></i>
-          رزمکارهای عقب‌افتاده
-        </h5>
-        <span class="badge bg-danger">{{ overdue_list|length }}</span>
-      </div>
-      <div class="card-body p-0">
-        <div class="list-group list-group-flush">
-          {% for razmkar in overdue_list[:5] %}
-          <div class="list-group-item border-0 py-3">
-            <div class="d-flex justify-content-between align-items-start">
-              <div class="flex-grow-1">
-                <h6 class="mb-1">
-                  <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=razmkar.id) }}" 
-                     class="text-decoration-none text-dark">
-                    {{ razmkar.mission }}
-                  </a>
-                </h6>
-                <p class="mb-1 text-muted small">
-                  <i class="fas fa-calendar me-1"></i>
-                  {{ razmkar.due_date|to_jalali }}
-                </p>
-                <small class="text-danger">
-                  <i class="fas fa-project-diagram me-1"></i>
-                  پروژه: {{ razmkar.project.goal[:30] }}...
-                </small>
-              </div>
-              <div class="text-end">
-                <span class="badge bg-danger bg-opacity-10 text-danger">عقب‌افتاده</span>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-          {% if overdue_list|length > 5 %}
-          <div class="list-group-item border-0 text-center">
-            <small class="text-muted">و {{ overdue_list|length - 5 }} مورد دیگر...</small>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
+  <section>
+    <h2>ماموریت‌های نیازمند اقدام</h2>
+    {% if pending_razmkars %}
+      <ul>
+        {% for rk in pending_razmkars %}
+          <li>
+           <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=rk.id) }}">
+  <strong>[{{ rk.project.client_name }} - {{ rk.project.goal }}] :</strong>
+  {{ rk.mission }} - {{ rk.status.value }}
+</a>
+            {% if rk.due_date %}
+              <span style="color:#999">({{ rk.due_date | to_jalali | to_persian_number }})</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>ماموریتی برای پیگیری وجود ندارد.</p>
+    {% endif %}
+  </section>
 
-  <!-- Today's Tasks -->
-  {% if today_list %}
-  <div class="col-lg-6 col-12">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-header bg-warning bg-opacity-10 border-0 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 text-warning">
-          <i class="fas fa-calendar-day me-2"></i>
-          رزمکارهای امروز
-        </h5>
-        <span class="badge bg-warning">{{ today_list|length }}</span>
-      </div>
-      <div class="card-body p-0">
-        <div class="list-group list-group-flush">
-          {% for razmkar in today_list[:5] %}
-          <div class="list-group-item border-0 py-3">
-            <div class="d-flex justify-content-between align-items-start">
-              <div class="flex-grow-1">
-                <h6 class="mb-1">
-                  <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=razmkar.id) }}" 
-                     class="text-decoration-none text-dark">
-                    {{ razmkar.mission }}
-                  </a>
-                </h6>
-                <p class="mb-1 text-muted small">
-                  <i class="fas fa-clock me-1"></i>
-                  امروز
-                </p>
-                <small class="text-muted">
-                  <i class="fas fa-project-diagram me-1"></i>
-                  پروژه: {{ razmkar.project.goal[:30] }}...
-                </small>
-              </div>
-              <div class="text-end">
-                <span class="badge bg-warning bg-opacity-10 text-warning">امروز</span>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-          {% if today_list|length > 5 %}
-          <div class="list-group-item border-0 text-center">
-            <small class="text-muted">و {{ today_list|length - 5 }} مورد دیگر...</small>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
+  <hr>
 
-  <!-- Tomorrow's Tasks -->
-  {% if tomorrow_list %}
-  <div class="col-lg-6 col-12">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-header bg-info bg-opacity-10 border-0 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 text-info">
-          <i class="fas fa-calendar-plus me-2"></i>
-          رزمکارهای فردا
-        </h5>
-        <span class="badge bg-info">{{ tomorrow_list|length }}</span>
-      </div>
-      <div class="card-body p-0">
-        <div class="list-group list-group-flush">
-          {% for razmkar in tomorrow_list[:5] %}
-          <div class="list-group-item border-0 py-3">
-            <div class="d-flex justify-content-between align-items-start">
-              <div class="flex-grow-1">
-                <h6 class="mb-1">
-                  <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=razmkar.id) }}" 
-                     class="text-decoration-none text-dark">
-                    {{ razmkar.mission }}
-                  </a>
-                </h6>
-                <p class="mb-1 text-muted small">
-                  <i class="fas fa-calendar me-1"></i>
-                  فردا
-                </p>
-                <small class="text-muted">
-                  <i class="fas fa-project-diagram me-1"></i>
-                  پروژه: {{ razmkar.project.goal[:30] }}...
-                </small>
-              </div>
-              <div class="text-end">
-                <span class="badge bg-info bg-opacity-10 text-info">فردا</span>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-          {% if tomorrow_list|length > 5 %}
-          <div class="list-group-item border-0 text-center">
-            <small class="text-muted">و {{ tomorrow_list|length - 5 }} مورد دیگر...</small>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
+  <section>
+    <h2>موارد نزدیک به موعد</h2>
+    {% if upcoming_razmkars %}
+      <ul>
+        {% for rk in upcoming_razmkars %}
+          <li>
+           <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=rk.id) }}">
+  {{ rk.project.client_name }} - {{ rk.project.goal }} :
+  {{ rk.mission }}
+</a>
 
-  <!-- This Week's Tasks -->
-  {% if week_list %}
-  <div class="col-lg-6 col-12">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-header bg-primary bg-opacity-10 border-0 d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 text-primary">
-          <i class="fas fa-calendar-week me-2"></i>
-          رزمکارهای این هفته
-        </h5>
-        <span class="badge bg-primary">{{ week_list|length }}</span>
-      </div>
-      <div class="card-body p-0">
-        <div class="list-group list-group-flush">
-          {% for razmkar in week_list[:5] %}
-          <div class="list-group-item border-0 py-3">
-            <div class="d-flex justify-content-between align-items-start">
-              <div class="flex-grow-1">
-                <h6 class="mb-1">
-                  <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=razmkar.id) }}" 
-                     class="text-decoration-none text-dark">
-                    {{ razmkar.mission }}
-                  </a>
-                </h6>
-                <p class="mb-1 text-muted small">
-                  <i class="fas fa-calendar me-1"></i>
-                  {{ razmkar.due_date|to_jalali }}
-                </p>
-                <small class="text-muted">
-                  <i class="fas fa-project-diagram me-1"></i>
-                  پروژه: {{ razmkar.project.goal[:30] }}...
-                </small>
-              </div>
-              <div class="text-end">
-                <span class="badge bg-primary bg-opacity-10 text-primary">این هفته</span>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-          {% if week_list|length > 5 %}
-          <div class="list-group-item border-0 text-center">
-            <small class="text-muted">و {{ week_list|length - 5 }} مورد دیگر...</small>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
-</div>
+            <strong style="color:red">({{ rk.due_date | to_jalali | to_persian_number }})</strong>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>ماموریتی با تاریخ نزدیک وجود ندارد.</p>
+    {% endif %}
+  </section>
 
-<!-- Empty State -->
-{% if not overdue_list and not today_list and not tomorrow_list and not week_list %}
-<div class="row">
-  <div class="col-12">
-    <div class="text-center py-5">
-      <div class="mb-4">
-        <i class="fas fa-calendar-check fa-4x text-success"></i>
-      </div>
-      <h3 class="text-muted mb-3">همه چیز تمام است! 🎉</h3>
-      <p class="text-muted mb-4">شما هیچ رزمکار فوری‌ای ندارید. وقت مناسبی برای شروع پروژه جدید است.</p>
-      <a href="{{ url_for('projects.create_project') }}" class="btn btn-primary me-2">
-        <i class="fas fa-plus"></i>
-        ایجاد پروژه جدید
-      </a>
-      <a href="{{ url_for('projects.list_projects') }}" class="btn btn-outline-primary">
-        <i class="fas fa-folder-open"></i>
-        مشاهده پروژه‌ها
-      </a>
-    </div>
-  </div>
-</div>
-{% endif %}
+  <hr>
 
-<!-- Quick Add Modal -->
-<div class="modal fade" id="quickAddModal" tabindex="-1" aria-labelledby="quickAddModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="quickAddModalLabel">
-          <i class="fas fa-plus me-2"></i>
-          افزودن سریع
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="d-grid gap-3">
-          <a href="{{ url_for('projects.create_project') }}" class="btn btn-outline-primary text-start">
-            <i class="fas fa-folder-plus me-3"></i>
-            <div>
-              <div class="fw-bold">پروژه جدید</div>
-              <small class="text-muted">ایجاد پروژه با هدف و کارفرمای جدید</small>
-            </div>
-          </a>
-          
-          {% if projects %}
-          <div class="dropdown">
-            <button class="btn btn-outline-success dropdown-toggle text-start w-100" type="button" data-bs-toggle="dropdown">
-              <i class="fas fa-tasks me-3"></i>
-              <div>
-                <div class="fw-bold">رزمکار جدید</div>
-                <small class="text-muted">افزودن رزمکار به پروژه موجود</small>
-              </div>
-            </button>
-            <ul class="dropdown-menu w-100">
-              <li><h6 class="dropdown-header">انتخاب پروژه:</h6></li>
-              {% for project in projects[:5] %}
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('razmkar.create_razmkar', project_id=project.id) }}">
-                    <i class="fas fa-project-diagram me-2"></i>
-                    {{ project.goal[:40] }}{% if project.goal|length > 40 %}...{% endif %}
-                  </a>
-                </li>
-              {% endfor %}
-              {% if projects|length > 5 %}
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                  <a class="dropdown-item" href="{{ url_for('projects.list_projects') }}">
-                    <i class="fas fa-ellipsis-h me-2"></i>
-                    مشاهده همه پروژه‌ها
-                  </a>
-                </li>
-              {% endif %}
-            </ul>
-          </div>
-          {% else %}
-          <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>
-            ابتدا یک پروژه ایجاد کنید تا بتوانید رزمکار اضافه کنید.
-          </div>
-          {% endif %}
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">بستن</button>
-      </div>
+  <section>
+    <a href="javascript:void(0);" onclick="openCreatePopup()">➕ افزودن پروژه جدید</a>
+  </section>
+
+  <!-- پاپ‌آپ ایجاد پروژه -->
+  <div id="create-project-popup" class="popup-overlay" style="display:none;">
+    <div class="popup">
+      <h3>ایجاد پروژه جدید</h3>
+      <form id="create-project-form">
+        <input name="client_name" placeholder="نام کارفرما" required><br>
+        <input name="goal" placeholder="هدف پروژه" required><br>
+        <select name="status" required>
+          <option value="draft">پیش‌نویس</option>
+          <option value="active">فعال</option>
+          <option value="waiting">در انتظار</option>
+          <option value="completed">اتمام</option>
+          <option value="cancelled">لغو</option>
+        </select><br>
+        <button type="submit">ذخیره</button>
+        <button type="button" onclick="closeCreatePopup()">لغو</button>
+      </form>
     </div>
   </div>
-</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function openCreatePopup() {
+    document.getElementById('create-project-popup').style.display = 'flex';
+  }
+
+  function closeCreatePopup() {
+    document.getElementById('create-project-popup').style.display = 'none';
+  }
+
+  document.getElementById('create-project-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    try {
+      const response = await fetch("/projects/", {
+        method: "POST",
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (response.ok) {
+        alert("✅ پروژه ایجاد شد");
+        location.reload();
+      } else {
+        const text = await response.text();
+        alert("❌ خطا: " + text);
+      }
+    } catch (err) {
+      alert("❌ خطای شبکه");
+    }
+  });
+</script>
 {% endblock %}

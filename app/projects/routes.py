@@ -88,24 +88,27 @@ def delete_project(project_id):
     return redirect(url_for('projects.list_projects'))
 
 
+@projects_bp.route('/create', methods=['GET', 'POST'])
+def create_project():
+    if request.method == "POST":
+        client_name = request.form.get('client_name')
+        goal = request.form.get('goal')
+        status_value = request.form.get('status', 'draft')
 
-@projects_bp.route('/<int:project_id>/edit', methods=['POST'])
-def edit_project(project_id):
-    project = Project.query.get_or_404(project_id)
+        try:
+            status_enum = ProjectStatus[status_value]
+        except KeyError:
+            flash("وضعیت نامعتبر است", "danger")
+            return redirect(url_for('projects.create_project'))
 
-    client_name = request.form.get('client_name')
-    goal = request.form.get('goal')
-    status = request.form.get('status')
+        if not client_name or not goal:
+            flash("همه فیلدها الزامی هستند", "warning")
+            return redirect(url_for('projects.create_project'))
 
-    if not client_name or not goal or not status:
-        return "همه فیلدها الزامی است", 400
-
-    try:
-        project.client_name = client_name
-        project.goal = goal
-        project.status = ProjectStatus[status]
+        new_project = Project(client_name=client_name, goal=goal, status=status_enum)
+        db.session.add(new_project)
         db.session.commit()
-        return redirect(url_for('projects.project_detail', project_id=project.id))
-    except Exception as e:
-        db.session.rollback()
-        return f"خطا در ذخیره تغییرات: {e}", 500
+        flash("پروژه با موفقیت ایجاد شد", "success")
+        return redirect(url_for('projects.project_detail', project_id=new_project.id))
+
+    return render_template("projects/create.html")

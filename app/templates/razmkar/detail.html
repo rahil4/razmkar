@@ -6,15 +6,32 @@
 
 {% block content %}
   <section>
+    <p class="breadcrumb" style="font-weight: bold;">
+ <strong>[ {{ razmkar.project.client_name }} ]  {{ razmkar.project.goal }} :</strong>
+  {% for parent in ancestors %}
+    <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=parent.id) }}">{{ parent.mission }}</a> >
+  {% endfor %}
+  <span>{{ razmkar.mission }}</span>
+</p>
     <h2>{{ razmkar.mission }}</h2>
     <p>{{ razmkar.note or "توضیحی وارد نشده" }}</p>
-    <p>
-      وضعیت: <strong>{{ razmkar.status.value }}</strong><br>
-      {% if razmkar.due_date %}
-        تاریخ انجام: {{ razmkar.due_date | to_jalali | to_persian_number }}<br>
-      {% endif %}
-      ایجاد شده: {{ razmkar.created_at | time_since | to_persian_number }}
-    </p>
+
+    <div id="status-section" class="mb-3">
+      <label>وضعیت:</label>
+      <select id="status-select" class="form-select" data-task-id="{{ razmkar.id }}">
+        <option value="pending" {{ 'selected' if razmkar.status.name == 'pending' else '' }}>پیش نویس</option>
+        <option value="in_progress" {{ 'selected' if razmkar.status.name == 'in_progress' else '' }}>درحال انجام</option>
+        <option value="done" {{ 'selected' if razmkar.status.name == 'done' else '' }}>انجام شده</option>
+        <option value="cancelled" {{ 'selected' if razmkar.status.name == 'cancelled' else '' }}>لغو</option>
+      </select>
+      <small id="status-message" class="text-success" style="display:none;">✔ وضعیت به‌روزرسانی شد.</small>
+    </div>
+
+    {% if razmkar.due_date %}
+      <p>تاریخ انجام: {{ razmkar.due_date | to_jalali | to_persian_number }}</p>
+    {% endif %}
+    <p>ایجاد شده: {{ razmkar.created_at | time_since | to_persian_number }}</p>
+    <button onclick="openEditRazmkarPopup()">✏️</button>
   </section>
 
   <hr>
@@ -24,9 +41,9 @@
     <ul>
       {% for log in razmkar.logs %}
         <li>
-          <strong>{{ log.created_at | to_jalali_with_time }}</strong> – 
-          {{ log.type }} – 
-          {{ log.content or "" }} 
+          <strong>{{ log.created_at | to_jalali_with_time | to_persian_number }}</strong> –
+          {{ log.type.value }} –
+          {{ log.content or "" }}
           {% if log.created_by %}(ثبت‌کننده: {{ log.created_by }}){% endif %}
         </li>
       {% else %}
@@ -56,10 +73,12 @@
     {% else %}
       <p>زیرماموریتی ثبت نشده است.</p>
     {% endif %}
-    <button onclick="openChildPopup()">➕ افزودن ماموریت زیرمجموعه</button>
+    <button onclick="openChildPopup()">➕ افزودن ماموریت </button>
+    
   </section>
 
-  <!-- پاپ‌آپ افزودن لاگ -->
+
+ <!-- پاپ‌آپ افزودن لاگ -->
   <div id="log-popup" class="popup-overlay" style="display:none;">
     <div class="popup">
       <h3>افزودن لاگ جدید</h3>
@@ -103,71 +122,177 @@
         <button type="button" onclick="closeChildPopup()">لغو</button>
       </form>
     </div>
+
+   
+
   </div>
-{% endblock %}
+   <!-- پاپ‌آپ ویرایش رزمکار -->
+<div id="edit-razmkar-popup" class="popup-overlay" style="display:none;">
+  <div class="popup">
+    <h3>ویرایش ماموریت</h3>
+    <form id="edit-razmkar-form">
+      <input type="hidden" name="razmkar_id" value="{{ razmkar.id }}">
+      <input name="mission" value="{{ razmkar.mission }}" placeholder="عنوان ماموریت" required><br>
+      <textarea name="note" placeholder="توضیح">{{ razmkar.note }}</textarea><br>
+      <input name="due_date" type="date" value="{{ razmkar.due_date.strftime('%Y-%m-%d') if razmkar.due_date }}"><br>
+      <select name="status" required>
+        <option value="pending" {{ 'selected' if razmkar.status.name == 'pending' else '' }}>پیش‌ نویس</option>
+        <option value="in_progress" {{ 'selected' if razmkar.status.name == 'in_progress' else '' }}>در حال انجام</option>
+        <option value="done" {{ 'selected' if razmkar.status.name == 'done' else '' }}>انجام شده</option>
+        <option value="cancelled" {{ 'selected' if razmkar.status.name == 'cancelled' else '' }}>لغو</option>
+      </select><br>
+      <button type="submit">ذخیره تغییرات</button>
+      <button type="button" onclick="deleteRazmkar({{ razmkar.id }})" class="btn-danger">🗑 حذف</button>
+      <button type="button" onclick="closeEditRazmkarPopup()">لغو</button>
+    </form>
+  </div>
+</div>
+  {% endblock %}
 
 {% block scripts %}
+  {{ super() }}
+  
 <script>
-  function openLogPopup() {
-    document.getElementById('log-popup').style.display = 'flex';
-  }
+  function openEditRazmkarPopup() {
+  document.getElementById("edit-razmkar-popup").style.display = "flex";
+}
 
-  function closeLogPopup() {
-    document.getElementById('log-popup').style.display = 'none';
-  }
+function closeEditRazmkarPopup() {
+  document.getElementById("edit-razmkar-popup").style.display = "none";
+}
 
-  document.getElementById('log-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-
-    try {
-      const response = await fetch(window.location.href, {
-        method: "POST",
-        body: formData,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+function deleteRazmkar(id) {
+  if (confirm("آیا از حذف این ماموریت مطمئن هستید؟")) {
+    fetch(`/razmkar/${id}/delete`, { method: 'POST' })
+      .then(response => response.json())
+      .then(data => {
+        alert(data.message);
+        window.location.href = "/"; // یا مسیر مناسب دیگر
       });
-
-      if (response.ok) {
-        alert("✅ لاگ ثبت شد");
-        location.reload();
-      } else {
-        const err = await response.text();
-        alert("❌ خطا: " + err);
-      }
-    } catch (err) {
-      alert("❌ خطای شبکه");
-      console.error(err);
-    }
-  });
-
-  function openChildPopup() {
-    document.getElementById('child-razmkar-popup').style.display = 'flex';
   }
+}
 
-  function closeChildPopup() {
-    document.getElementById('child-razmkar-popup').style.display = 'none';
-  }
+function openLogPopup() {
+  document.getElementById("log-popup").style.display = "flex";
+}
 
-  document.getElementById('child-razmkar-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    try {
-      const response = await fetch("/razmkar/create", {
-        method: "POST",
-        body: formData,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-      });
-      if (response.ok) {
-        alert("✅ ماموریت زیرمجموعه ثبت شد");
-        location.reload();
-      } else {
-        const err = await response.text();
-        alert("❌ خطا: " + err);
-      }
-    } catch (err) {
-      alert("❌ خطای سرور یا شبکه");
-      console.error(err);
-    }
-  });
+function closeLogPopup() {
+  document.getElementById("log-popup").style.display = "none";
+}
+
+function openChildPopup() {
+  document.getElementById("child-razmkar-popup").style.display = "flex";
+}
+
+function closeChildPopup() {
+  document.getElementById("child-razmkar-popup").style.display = "none";
+}
 </script>
+
+
+<script>
+
+
+document.getElementById('log-form').addEventListener('submit', function (e) {
+  e.preventDefault();
+
+  const formData = new FormData(this);
+  const taskId = formData.get('razmkar_id');
+
+  fetch(`/razmkar/${taskId}`, {
+    method: 'POST',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    alert(data.message);
+    closeLogPopup();
+    location.reload(); // یا با JS اضافه کردن لاگ بدون reload انجام بشه
+  })
+  .catch(error => {
+    alert("❌ خطا در ثبت لاگ");
+    console.error(error);
+  });
+});
+</script>
+
+
+
+ <script>
+    document.getElementById('status-select').addEventListener('change', function () {
+      const status = this.value;
+      const taskId = this.dataset.taskId;
+
+      fetch(`/razmkar/${taskId}/update_status_ajax`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: status })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const msg = document.getElementById('status-message');
+          msg.style.display = 'inline';
+          setTimeout(() => msg.style.display = 'none', 2000);
+        }
+      });
+    });
+
+
+    document.getElementById("edit-razmkar-form").addEventListener("submit", function (e) {
+  e.preventDefault();
+
+  const formData = new FormData(this);
+  const taskId = formData.get("razmkar_id");
+
+  fetch(`/razmkar/${taskId}/edit`, {
+    method: "POST",
+    body: formData,
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert(data.message);
+    closeEditRazmkarPopup();
+    location.reload();
+  })
+  .catch(err => {
+    alert("❌ خطا در ویرایش ماموریت");
+    console.error(err);
+  });
+});
+
+
+document.getElementById('child-razmkar-form').addEventListener('submit', function (e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+
+  fetch("/razmkar/create", {
+    method: "POST",
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert(data.message);
+    closeChildPopup();
+    location.reload();
+  })
+  .catch(err => {
+    alert("❌ خطا در افزودن زیرماموریت");
+    console.error(err);
+  });
+});
+
+
+  </script>
 {% endblock %}

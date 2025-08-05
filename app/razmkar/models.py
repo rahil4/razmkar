@@ -11,11 +11,11 @@ class RazmkarStatus(enum.Enum):
     cancelled = "لغو"
 
 class RazmkarLogType(enum.Enum):
-    note = "note"
-    action = "action"
-    followup = "followup"
-    reminder = "reminder"
-    status_change = "status_change"
+    note = "یادداشت"
+    action = "فعالیت"
+    followup = "پیگیری"
+    reminder = "یادآوری"
+    status_change = "تغیر وضعیت"
     file_upload = "file_upload"
 
 class Razmkar(db.Model):
