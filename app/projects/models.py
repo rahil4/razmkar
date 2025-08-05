@@ -12,10 +12,10 @@ class ProjectStatus(enum.Enum):
     cancelled = "لغو"
 
 class LogType(enum.Enum):
-    note = "note"
-    action = "action"
-    followup = "followup"
-    reminder = "reminder"
+    note = "یادداشت"
+    action = "فعالیت"
+    followup = "پیگیری"
+    reminder = "یادآوری"
 
     def label(self):
         return {

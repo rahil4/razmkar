@@ -2,6 +2,8 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash
 from .models import Project, ProjectStatus, ProjectLog, LogType
 from app.extensions import db
 from app.razmkar.models import Razmkar
+from flask import Blueprint, render_template, request, jsonify
+
 
 projects_bp = Blueprint('projects', __name__)
 
@@ -112,3 +114,50 @@ def create_project():
         return redirect(url_for('projects.project_detail', project_id=new_project.id))
 
     return render_template("projects/create.html")
+
+@projects_bp.route('/<int:project_id>/edit', methods=['POST'])
+def edit_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return "⛔ درخواست نامعتبر", 400
+
+    project.client_name = request.form.get('client_name')
+    project.goal = request.form.get('goal')
+    project.status = ProjectStatus[request.form.get('status')]
+    db.session.commit()
+
+    return jsonify({"message": "✅ پروژه با موفقیت ویرایش شد"})
+
+
+@projects_bp.route('/<int:project_id>/add-log', methods=['POST'])
+def add_project_log(project_id):
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return "⛔ درخواست نامعتبر", 400
+
+    note = request.form.get("note")
+    created_by = request.form.get("created_by")
+    type_ = request.form.get("type")
+
+    if not note or not type_:
+        return "مقدارهای لازم وارد نشده", 400
+
+    try:
+        type_enum = LogType(type_)  # 🎯 تبدیل رشته به Enum
+
+        new_log = ProjectLog(
+            project_id=project_id,
+            note=note,
+            created_by=created_by,
+            type=type_enum
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        return jsonify({"message": "لاگ با موفقیت ثبت شد"})
+    
+    except ValueError:
+        return "❌ نوع لاگ نامعتبر است", 400
+
+    except Exception as e:
+        print("❌ خطا در افزودن لاگ پروژه:", e)
+        return f"خطای سرور: {e}", 500

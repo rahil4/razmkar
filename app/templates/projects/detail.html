@@ -5,13 +5,22 @@
 {% block header %}جزئیات پروژه{% endblock %}
 
 {% block content %}
-  <section>
-    <h2>{{ project.client_name }} - {{ project.goal }}</h2>
-    <p>{{ project.status.value }}</p>
-    <span>{{ project.created_at | time_since | to_persian_number }}</span>
-    <br>
-    <button onclick="openEditPopup()">✏️ ویرایش پروژه</button>
-  </section>
+<section style="margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <h2 style="margin: 0;">
+      {{ project.client_name }} - {{ project.goal }}
+    </h2>
+    <button onclick="openEditPopup()" title="ویرایش پروژه" style="background: none; border: none; cursor: pointer; font-size: 1.2rem;">
+  ✏️
+</button>
+
+  </div>
+
+  <div style="margin-top: 0.5rem; color: #555;">
+    <span>{{ project.created_at | time_since | to_persian_number }}</span> <span style="margin-right: 1rem;">{{ project.status.value }}</span>
+  </div>
+</section>
+
 
   <hr>
 
@@ -27,21 +36,23 @@
 
   <hr>
 
-  <section>
-    <h3>لاگ‌ها</h3>
-    <ul id="logs-list">
-      {% for log in project.logs %}
-        <li>
-          <strong>{{ log.created_at | to_jalali_with_time }}</strong> –
-          {{ log.type }} –
-          {{ log.note }} (ثبت‌کننده: {{ log.created_by }})
-        </li>
-      {% else %}
-        <li>هنوز لاگی ثبت نشده است.</li>
-      {% endfor %}
-    </ul>
-    <button onclick="openLogPopup()">➕ افزودن لاگ</button>
-  </section>
+<section>
+  
+  <ul id="logs-list" style="font-family: monospace;">
+    {% for log in project.logs | reverse %}
+      <li>
+        {{ log.created_at.strftime('%Y/%m/%d - %H:%M') | to_persian_number }}
+        [{{ log.type.value }}]  <strong>{{ log.note | to_persian_number }}</strong>
+      </li>
+    {% else %}
+      <li>هنوز لاگی ثبت نشده است.</li>
+    {% endfor %}
+  </ul>
+  <button onclick="openLogPopup()">➕ افزودن لاگ</button>
+</section>
+
+
+
 
   <!-- پاپ‌آپ افزودن ماموریت -->
   <div id="razmkar-popup" class="popup-overlay" style="display:none;">
