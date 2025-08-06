@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}امروز من{% endblock %}
+
+{% block header %}ماموریت‌های امروز{% endblock %}
+
+{% block content %}
+<style>
+  .mission {
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .mission.done {
+    text-decoration: line-through;
+    color: #999;
+  }
+
+  .mission a {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+
+  .project {
+    font-weight: bold;
+    color: #444;
+  }
+
+  .status {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-right: 0.5rem;
+  }
+
+  .status.pending { background: #fff3cd; color: #856404; }
+  .status.in_progress { background: #e0f7fa; color: #006064; }
+  .status.done { background: #dcedc8; color: #33691e; }
+  .status.cancelled { background: #f8d7da; color: #721c24; }
+
+  .date {
+    font-size: 0.8rem;
+    color: #aaa;
+    margin-top: 0.25rem;
+  }
+</style>
+
+<section>
+  {% if today_razmkars %}
+    {% for rk in today_razmkars %}
+      <div class="mission {% if rk.status.name == 'done' %}done{% endif %}">
+        <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=rk.id) }}">
+          <div class="project">{{ rk.project.client_name }} - {{ rk.project.goal }}</div>
+          <div>{{ rk.mission }}</div>
+          <div>
+            <span class="status {{ rk.status.name }}">{{ rk.status.value }}</span>
+            {% if rk.due_date %}
+              <span class="date">{{ rk.due_date | to_jalali | to_persian_number }}</span>
+            {% endif %}
+          </div>
+        </a>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>برای امروز ماموریتی ثبت نشده است.</p>
+  {% endif %}
+</section>
+{% endblock %}

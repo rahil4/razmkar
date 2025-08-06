@@ -142,7 +142,7 @@ def add_project_log(project_id):
         return "مقدارهای لازم وارد نشده", 400
 
     try:
-        type_enum = LogType(type_)  # 🎯 تبدیل رشته به Enum
+        type_enum = LogType[type_]  # ← حالا "note" یا "action" را قبول می‌کند
 
         new_log = ProjectLog(
             project_id=project_id,
@@ -161,3 +161,48 @@ def add_project_log(project_id):
     except Exception as e:
         print("❌ خطا در افزودن لاگ پروژه:", e)
         return f"خطای سرور: {e}", 500
+
+
+@projects_bp.route('/log/<int:log_id>')
+def get_log(log_id):
+    log = ProjectLog.query.get_or_404(log_id)
+    return jsonify({
+        "note": log.note,
+        "created_by": log.created_by,
+        "type": log.type.name
+    })
+
+
+@projects_bp.route('/log/<int:log_id>/edit', methods=['POST'])
+def edit_log(log_id):
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return "⛔ درخواست نامعتبر", 400
+
+    log = ProjectLog.query.get_or_404(log_id)
+
+    note = request.form.get("note")
+    created_by = request.form.get("created_by")
+    type_ = request.form.get("type")
+
+    if not note or not type_:
+        return "❌ اطلاعات ناقص", 400
+
+    try:
+        log.note = note
+        log.created_by = created_by
+        log.type = LogType[type_]
+        db.session.commit()
+        return jsonify({"message": "ویرایش شد"})
+    except Exception as e:
+        return f"❌ خطا: {e}", 500
+
+
+@projects_bp.route('/log/<int:log_id>/delete', methods=['POST'])
+def delete_log(log_id):
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return "⛔ درخواست نامعتبر", 400
+
+    log = ProjectLog.query.get_or_404(log_id)
+    db.session.delete(log)
+    db.session.commit()
+    return jsonify({"message": "حذف شد"})

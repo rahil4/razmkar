@@ -6,7 +6,7 @@ from app.dashboard.routes import dashboard_bp
 from app.utils.jinja import to_jalali, to_jalali_with_time, to_jalali_detailed
 from app.utils.jinja import to_jalali, time_since
 from app.utils.jinja import to_jalali, time_since, persian_digits
-
+from app.utils.jinja import highlight_tags
 
 def create_app():
     app = Flask(__name__)
@@ -35,6 +35,10 @@ def create_app():
     app.jinja_env.filters['time_since'] = time_since
     app.jinja_env.filters['persian_digits'] = persian_digits
     app.jinja_env.filters['to_persian_number'] = persian_digits
+    app.jinja_env.filters['highlight_tags'] = highlight_tags
+
+    
+        
 
 
 

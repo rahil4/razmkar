@@ -1,34 +1,42 @@
-├── __init__.py
+├── README.md
 ├── app
 │   ├── __init__.py
 │   ├── dashboard
-│   │   ├── routes.py
+│   │   └── routes.py
 │   ├── extensions.py
 │   ├── projects
 │   │   ├── forms.py
 │   │   ├── models.py
-│   │   ├── routes.py
+│   │   └── routes.py
 │   ├── razmkar
 │   │   ├── __init__.py
+│   │   │   ├── models.cpython-310.pyc
+│   │   │   └── routes.cpython-310.pyc
 │   │   ├── forms.py
 │   │   ├── models.py
-│   │   ├── routes.py
+│   │   └── routes.py
+│   ├── static
+│   │   └── fonts
 │   ├── templates
 │   │   ├── base.html
 │   │   ├── dashboard
 │   │   │   ├── index.html
+│   │   │   └── partials
+│   │   │       └── _section.html
 │   │   ├── projects
-│   │   │   ├── create.html
 │   │   │   ├── detail.html
-│   │   │   ├── list.html
-│   │   │   └── overview.html
+│   │   │   └── list.html
 │   │   └── razmkar
+│   │       ├── _tree.html
 │   │       ├── create.html
 │   │       ├── detail.html
-│   │       ├── list.html
+│   │       └── list.html
+│   └── utils
+│       └── jinja.py
 ├── instance
 │   ├── config.py
 │   ├── db.sqlite3
+│   └── db1.sqlite3
 ├── requirements.txt
 ├── run.py
 └── stracture.txt

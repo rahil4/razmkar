@@ -85,3 +85,18 @@ def persian_digits(value):
         return str(value).translate(english_to_persian)
     except:
         return value
+
+
+
+
+import re
+from markupsafe import Markup, escape
+
+def highlight_tags(text):
+    def replacer(match):
+        tag = match.group(0)
+        return f'<span class="tag">{escape(tag)}</span>'
+    
+    escaped = escape(text)
+    highlighted = re.sub(r'#\w[\w\d_آ-ی-]*', replacer, escaped)
+    return Markup(highlighted)

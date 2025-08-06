@@ -2,130 +2,128 @@
 
 {% block title %}داشبورد{% endblock %}
 
-{% block header %}داشبورد{% endblock %}
+{% block header %}مرکز مدیریت و برنامه‌ریزی{% endblock %}
 
 {% block content %}
-  <section>
-    <h2>پروژه‌های فعال</h2>
-    {% if active_projects %}
-      <ul>
-        {% for project in active_projects %}
-          <li>
-            <a href="{{ url_for('projects.project_detail', project_id=project.id) }}">
-              {{ project.client_name }} - {{ project.goal }}
-            </a>
-            {% if project.next_due %}
-              <span style="color:#999">({{ project.next_due | to_jalali | to_persian_number }})</span>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>پروژه فعالی یافت نشد.</p>
-    {% endif %}
-  </section>
+<style>
+  section h2 {
+    margin-top: 2rem;
+    font-size: 1.1rem;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.3rem;
+    font-weight: 600;
+  }
 
-  <hr>
+  ul.task-list {
+    padding: 0;
+    list-style: none;
+  }
 
-  <section>
-    <h2>ماموریت‌های نیازمند اقدام</h2>
-    {% if pending_razmkars %}
-      <ul>
-        {% for rk in pending_razmkars %}
-          <li>
-           <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=rk.id) }}">
-  <strong>[{{ rk.project.client_name }} - {{ rk.project.goal }}] :</strong>
-  {{ rk.mission }} - {{ rk.status.value }}
-</a>
+  ul.task-list li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.95rem;
+  }
+
+  .task-meta {
+    color: #888;
+    font-size: 0.8rem;
+  }
+
+  .status-label {
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 0.1rem 0.4rem;
+    border-radius: 5px;
+    display: inline-block;
+    margin-right: 0.5rem;
+  }
+
+  .status.pending { background-color: #fff3cd; color: #856404; }
+  .status.in_progress { background-color: #e0f7fa; color: #006064; }
+  .status.done { background-color: #dcedc8; color: #33691e; }
+  .status.cancelled { background-color: #f8d7da; color: #721c24; }
+</style>
+
+<section>
+  <h2>پروژه‌های فعال</h2>
+  {% if active_projects %}
+    <ul class="task-list">
+      {% for project in active_projects %}
+        <li>
+          <a href="{{ url_for('projects.project_detail', project_id=project.id) }}">
+            {{ project.client_name }} - {{ project.goal }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>پروژه فعالی یافت نشد.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>ماموریت‌های نیازمند اقدام (با تأخیر)</h2>
+  {% if pending_razmkars %}
+    <ul class="task-list">
+      {% for rk in pending_razmkars %}
+        <li>
+          <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=rk.id) }}">
+            <strong>{{ rk.project.client_name }} - {{ rk.project.goal }}</strong>: {{ rk.mission }}
+          </a>
+          <div class="task-meta">
+            <span class="status-label {{ rk.status.name }}">{{ rk.status.value }}</span>
             {% if rk.due_date %}
-              <span style="color:#999">({{ rk.due_date | to_jalali | to_persian_number }})</span>
+              <span>تاریخ: {{ rk.due_date | to_jalali | to_persian_number }}</span>
             {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>ماموریتی برای پیگیری وجود ندارد.</p>
-    {% endif %}
-  </section>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>ماموریت عقب‌افتاده‌ای یافت نشد.</p>
+  {% endif %}
+</section>
 
-  <hr>
+<section>
+  <h2>ماموریت‌های بدون زمان‌بندی</h2>
+  {% if unscheduled_razmkars %}
+    <ul class="task-list">
+      {% for rk in unscheduled_razmkars %}
+        <li>
+          <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=rk.id) }}">
+            <strong>{{ rk.project.client_name }} - {{ rk.project.goal }}</strong>: {{ rk.mission }}
+          </a>
+          <div class="task-meta">
+            <span class="status-label {{ rk.status.name }}">{{ rk.status.value }}</span>
+            <span>بدون تاریخ</span>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>همه‌ی ماموریت‌ها زمان‌بندی دارند.</p>
+  {% endif %}
+</section>
 
-  <section>
-    <h2>موارد نزدیک به موعد</h2>
-    {% if upcoming_razmkars %}
-      <ul>
-        {% for rk in upcoming_razmkars %}
-          <li>
-           <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=rk.id) }}">
-  {{ rk.project.client_name }} - {{ rk.project.goal }} :
-  {{ rk.mission }}
-</a>
-
-            <strong style="color:red">({{ rk.due_date | to_jalali | to_persian_number }})</strong>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>ماموریتی با تاریخ نزدیک وجود ندارد.</p>
-    {% endif %}
-  </section>
-
-  <hr>
-
-  <section>
-    <a href="javascript:void(0);" onclick="openCreatePopup()">➕ افزودن پروژه جدید</a>
-  </section>
-
-  <!-- پاپ‌آپ ایجاد پروژه -->
-  <div id="create-project-popup" class="popup-overlay" style="display:none;">
-    <div class="popup">
-      <h3>ایجاد پروژه جدید</h3>
-      <form id="create-project-form">
-        <input name="client_name" placeholder="نام کارفرما" required><br>
-        <input name="goal" placeholder="هدف پروژه" required><br>
-        <select name="status" required>
-          <option value="draft">پیش‌نویس</option>
-          <option value="active">فعال</option>
-          <option value="waiting">در انتظار</option>
-          <option value="completed">اتمام</option>
-          <option value="cancelled">لغو</option>
-        </select><br>
-        <button type="submit">ذخیره</button>
-        <button type="button" onclick="closeCreatePopup()">لغو</button>
-      </form>
-    </div>
-  </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-  function openCreatePopup() {
-    document.getElementById('create-project-popup').style.display = 'flex';
-  }
-
-  function closeCreatePopup() {
-    document.getElementById('create-project-popup').style.display = 'none';
-  }
-
-  document.getElementById('create-project-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    try {
-      const response = await fetch("/projects/", {
-        method: "POST",
-        body: formData,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-      });
-      if (response.ok) {
-        alert("✅ پروژه ایجاد شد");
-        location.reload();
-      } else {
-        const text = await response.text();
-        alert("❌ خطا: " + text);
-      }
-    } catch (err) {
-      alert("❌ خطای شبکه");
-    }
-  });
-</script>
+<section>
+  <h2>ماموریت‌های نزدیک به موعد</h2>
+  {% if upcoming_razmkars %}
+    <ul class="task-list">
+      {% for rk in upcoming_razmkars %}
+        <li>
+          <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=rk.id) }}">
+            <strong>{{ rk.project.client_name }} - {{ rk.project.goal }}</strong>: {{ rk.mission }}
+          </a>
+          <div class="task-meta">
+            <span class="status-label {{ rk.status.name }}">{{ rk.status.value }}</span>
+            <span>{{ rk.due_date | to_jalali | to_persian_number }}</span>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>هیچ ماموریتی در ۷ روز آینده وجود ندارد.</p>
+  {% endif %}
+</section>
 {% endblock %}

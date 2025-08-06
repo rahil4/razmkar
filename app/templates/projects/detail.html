@@ -25,13 +25,14 @@
   <hr>
 
   <section>
-    <h3>رزمکارها</h3>
+    <h3>ماموریت ها</h3>
     <ul>
       {% for razmkar in project.razmkars if razmkar.parent_id is none %}
         {% include 'razmkar/_tree.html' with context %}
       {% endfor %}
     </ul>
-    <button onclick="openRazmkarPopup()">➕ افزودن ماموریت</button>
+   <button class="button-glass" onclick="openRazmkarPopup()">➕ افزودن ماموریت</button>
+
   </section>
 
   <hr>
@@ -39,85 +40,117 @@
 <section>
   
   <ul id="logs-list" style="font-family: monospace;">
-    {% for log in project.logs | reverse %}
-      <li>
+  {% for log in project.logs | reverse %}
+    <li>
+      <span>
         {{ log.created_at.strftime('%Y/%m/%d - %H:%M') | to_persian_number }}
-        [{{ log.type.value }}]  <strong>{{ log.note | to_persian_number }}</strong>
-      </li>
-    {% else %}
-      <li>هنوز لاگی ثبت نشده است.</li>
-    {% endfor %}
-  </ul>
-  <button onclick="openLogPopup()">➕ افزودن لاگ</button>
+        [{{ log.type.value }}]  <strong>{{ log.note | to_persian_number | highlight_tags }}</strong>
+
+      </span>
+      <button onclick="editLog({{log.id}})" title="ویرایش لاگ" style="background: none; border: none; cursor: pointer;">✏️</button>
+    </li>
+  {% else %}
+    <li>هنوز لاگی ثبت نشده است.</li>
+  {% endfor %}
+</ul>
+<button class="button-glass" onclick="openLogPopup()">➕ افزودن لاگ</button>
+
 </section>
 
-
-
-
   <!-- پاپ‌آپ افزودن ماموریت -->
-  <div id="razmkar-popup" class="popup-overlay" style="display:none;">
-    <div class="popup">
-      <h3>افزودن ماموریت جدید</h3>
-      <form id="razmkar-form">
-        <input type="hidden" name="project_id" value="{{ project.id }}">
-        <input name="mission" placeholder="شرح ماموریت" required><br>
-        <textarea name="note" placeholder="توضیحات"></textarea><br>
-        <input name="due_date" type="date"><br>
-        <select name="status" required>
-          <option value="">وضعیت ماموریت</option>
-          <option value="pending">پیش‌نویس</option>
-          <option value="in_progress">در حال انجام</option>
-          <option value="done">انجام شده</option>
-          <option value="cancelled">لغو</option>
-        </select><br>
-        <button type="submit">ذخیره</button>
-        <button type="button" onclick="closeRazmkarPopup()">لغو</button>
-      </form>
-    </div>
+<div id="razmkar-popup" class="popup-overlay" style="display:none;">
+  <div class="popup">
+    <h3>افزودن ماموریت جدید</h3>
+    <form id="razmkar-form" style="display: flex; flex-direction: column; gap: 0.8rem;">
+      <input type="hidden" name="project_id" value="{{ project.id }}">
+
+      <input name="mission" placeholder="شرح ماموریت" required 
+             style="padding: 0.6rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 8px;">
+
+      <textarea name="note" placeholder="توضیحات" rows="4"
+                style="padding: 0.6rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 8px; resize: vertical;"></textarea>
+
+      <input name="due_date" type="date"
+             style="padding: 0.6rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 8px;">
+
+      <select name="status" required
+              style="padding: 0.6rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 8px;">
+        <option value="">وضعیت ماموریت</option>
+        <option value="pending">پیش‌نویس</option>
+        <option value="in_progress">در حال انجام</option>
+        <option value="done">انجام شده</option>
+        <option value="cancelled">لغو</option>
+      </select>
+
+      <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 0.5rem;">
+        <button type="submit" class="button-glass">ذخیره</button>
+        <button type="button" onclick="closeRazmkarPopup()" class="button-glass">لغو</button>
+      </div>
+    </form>
   </div>
+</div>
 
   <!-- پاپ‌آپ افزودن لاگ پروژه -->
-  <div id="log-popup" class="popup-overlay" style="display:none;">
-    <div class="popup">
-      <h3>افزودن لاگ پروژه</h3>
-      <form id="log-form">
-        <input type="hidden" name="project_id" value="{{ project.id }}">
-        <textarea name="note" placeholder="توضیح لاگ..." required></textarea><br>
-        <input name="created_by" placeholder="ثبت‌کننده"><br>
-        <select name="type" required>
-          <option value="">نوع لاگ</option>
-          <option value="note">یادداشت</option>
-          <option value="meeting">جلسه</option>
-          <option value="update">به‌روزرسانی</option>
-          <option value="followup">پیگیری</option>
-        </select><br>
-        <button type="submit">ذخیره</button>
-        <button type="button" onclick="closeLogPopup()">لغو</button>
-      </form>
-    </div>
-  </div>
+ <div id="log-popup" class="popup-overlay" style="display:none;">
+  <div class="popup">
+    <h3 style="margin-top: 0;">افزودن لاگ پروژه</h3>
+    <form id="log-form">
+      <input type="hidden" name="project_id" value="{{ project.id }}">
 
-  <!-- پاپ‌آپ ویرایش پروژه -->
-  <div id="edit-project-popup" class="popup-overlay" style="display:none;">
-    <div class="popup">
-      <h3>ویرایش پروژه</h3>
-      <form id="edit-project-form">
-        <input type="hidden" name="project_id" value="{{ project.id }}">
-        <input name="client_name" value="{{ project.client_name }}" placeholder="نام کارفرما" required><br>
-        <input name="goal" value="{{ project.goal }}" placeholder="هدف پروژه" required><br>
-        <select name="status" required>
-          <option value="draft" {% if project.status.name == 'draft' %}selected{% endif %}>پیش‌نویس</option>
-          <option value="active" {% if project.status.name == 'active' %}selected{% endif %}>فعال</option>
-          <option value="waiting" {% if project.status.name == 'waiting' %}selected{% endif %}>در انتظار</option>
-          <option value="completed" {% if project.status.name == 'completed' %}selected{% endif %}>اتمام</option>
-          <option value="cancelled" {% if project.status.name == 'cancelled' %}selected{% endif %}>لغو</option>
-        </select><br>
-        <button type="submit">ذخیره تغییرات</button>
-        <button type="button" onclick="deleteProject()" style="background:#c00;color:#fff;">🗑️ حذف پروژه</button>
-        <button type="button" onclick="closeEditPopup()">لغو</button>
-      </form>
-    </div>
+      <label for="note">یادداشت</label><br>
+      <textarea name="note" rows="5" style="width: 100%; padding: 0.5rem; font-family: inherit;" required></textarea><br><br>
+
+      <label for="created_by">ثبت‌کننده</label><br>
+      <input name="created_by" placeholder="نام یا عنوان" value="راهیل" style="width: 100%; padding: 0.4rem;"><br><br>
+
+      <label for="type">نوع لاگ</label><br>
+      <select name="type" required style="width: 100%; padding: 0.4rem;">
+        <option value="">نوع لاگ</option>
+        <option value="note">یادداشت</option>
+        <option value="action">فعالیت</option>
+        <option value="followup">پیگیری</option>
+        <option value="reminder">یادآوری</option>
+      </select><br><br>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+        <button type="submit" style="padding: 0.4rem 1rem;">ذخیره</button>
+        <button type="button" onclick="closeLogPopup()" style="padding: 0.4rem 1rem;">لغو</button>
+      </div>
+    </form>
   </div>
+</div>
+
+
+
+
+  <!-- پاپ‌آپ ویرایش لاگ -->
+<div id="edit-log-popup" class="popup-overlay" style="display:none;">
+  <div class="popup">
+    <h3>ویرایش لاگ</h3>
+    <form id="edit-log-form">
+      <input type="hidden" name="log_id" id="edit-log-id">
+
+      <textarea name="note" id="edit-log-note" placeholder="توضیح لاگ..." required style="width: 100%; height: 100px; margin-bottom: 1rem;"></textarea>
+
+      <input name="created_by" id="edit-log-created-by" placeholder="ثبت‌کننده" style="width: 100%; margin-bottom: 1rem;">
+
+      <select name="type" id="edit-log-type" required style="width: 100%; margin-bottom: 1rem;">
+        <option value="">نوع لاگ</option>
+        <option value="note">یادداشت</option>
+        <option value="action">فعالیت</option>
+        <option value="followup">پیگیری</option>
+        <option value="reminder">یادآوری</option>
+      </select>
+
+      <div style="display: flex; justify-content: space-between; gap: 0.5rem;">
+        <button type="submit" style="flex: 1;">💾 ذخیره</button>
+        <button type="button" onclick="deleteLog()" style="flex: 1; background:#c00; color:#fff;">🗑️ حذف</button>
+        <button type="button" onclick="closeEditLogPopup()" style="flex: 1;">لغو</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -227,5 +260,69 @@
       alert("❌ خطای شبکه یا سرور");
     }
   }
+
+
+  function editLog(logId) {
+  fetch(`/projects/log/${logId}`)
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('edit-log-id').value = logId;
+      document.getElementById('edit-log-note').value = data.note;
+      document.getElementById('edit-log-created-by').value = data.created_by || '';
+      document.getElementById('edit-log-type').value = data.type;
+      document.getElementById('edit-log-popup').style.display = 'flex';
+    })
+    .catch(err => {
+      alert("❌ خطا در دریافت اطلاعات لاگ");
+      console.error(err);
+    });
+}
+
+function closeEditLogPopup() {
+  document.getElementById('edit-log-popup').style.display = 'none';
+}
+
+document.getElementById('edit-log-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  try {
+    const response = await fetch(`/projects/log/${formData.get('log_id')}/edit`, {
+      method: "POST",
+      body: formData,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    if (response.ok) {
+      alert("✅ تغییرات ثبت شد");
+      location.reload();
+    } else {
+      const err = await response.text();
+      alert("❌ خطا: " + err);
+    }
+  } catch (err) {
+    alert("❌ خطای شبکه");
+    console.error(err);
+  }
+});
+
+async function deleteLog() {
+  const logId = document.getElementById('edit-log-id').value;
+  if (!confirm("آیا از حذف این لاگ مطمئن هستید؟")) return;
+  try {
+    const response = await fetch(`/projects/log/${logId}/delete`, {
+      method: "POST",
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    if (response.ok) {
+      alert("✅ لاگ حذف شد");
+      location.reload();
+    } else {
+      const text = await response.text();
+      alert("❌ خطا: " + text);
+    }
+  } catch (err) {
+    alert("❌ خطای سرور یا شبکه");
+  }
+}
+
 </script>
 {% endblock %}

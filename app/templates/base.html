@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}عنوان صفحه{% endblock %}</title>
 
-  <!-- فونت محلی Vazirmatn با همه وزن‌ها -->
+ 
   <style>
   a {
   text-decoration: none;
-  color: #0d6efd; /* آبی کلاسیک لینک */
+  color: #05152c; /* آبی کلاسیک لینک */
 }
 
 a:hover {
@@ -74,6 +74,16 @@ a:hover {
       box-sizing: border-box;
     }
 
+     .tag {
+    background-color: #e0f7fa;
+    color: #006064;
+    padding: 0 4px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin: 0 2px;
+  }
+
     body {
       margin: 0;
       padding: 1rem;
@@ -90,7 +100,7 @@ a:hover {
       font-weight: inherit;
 }
     header {
-      margin-bottom: 2rem;
+      margin-bottom: 1rem;
       padding-bottom: 0.5rem;
       border-bottom: 1px solid #ddd;
     }
@@ -113,6 +123,24 @@ a:hover {
       }
     }
 
+.button-glass {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 10px;
+  color: #0d6efd;
+  font-size: 0.95rem;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.button-glass:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #084298;
+  border-color: rgba(255, 255, 255, 0.4);
+}
         /* استایل پاپ‌آپ عمومی */
 .popup-overlay {
   position: fixed;
@@ -196,27 +224,35 @@ a:hover {
   {% block styles %}{% endblock %}
 </head>
 <body>
-  <header>
-    <h1>{% block header %}مدیریت پروژه{% endblock %}</h1>
-  </header>
+
 <nav>
   <a class="nav-title" href="/">RAZMKAR</a>
   <button class="nav-toggle" onclick="toggleMenu()">☰</button>
   <div class="nav-links" id="navLinks">
-    <a href="/">داشبورد</a>
+    <a href="/today">امروز من</a>
     <a href="/projects">پروژه‌ها</a>
     <a href="/razmkar/list">ماموریت‌ها</a>
+    <a href="/">داشبورد</a>
   </div>
 </nav>
-<script>
+
+
+  <header>
+    <h5>{% block header %} {% endblock %}</h5>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+
+
+
+  <script>
   function toggleMenu() {
     const links = document.getElementById('navLinks');
     links.classList.toggle('show');
   }
 </script>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
-  {% block scripts %}{% endblock %}
 </body>
 </html>
