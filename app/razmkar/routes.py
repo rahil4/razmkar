@@ -169,3 +169,64 @@ def delete_razmkar(razmkar_id):
     db.session.delete(razmkar)
     db.session.commit()
     return jsonify({'message': 'ماموریت حذف شد'})
+
+
+@razmkar_bp.route('/<int:razmkar_id>/add-log', methods=['POST'])
+def add_log(razmkar_id):
+    # فقط از طریق AJAX مجاز
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return jsonify({'message': 'درخواست نامعتبر است'}), 400
+
+    # گرفتن داده‌های فرم
+    content = request.form.get('content')
+    type_ = request.form.get('type')
+    created_by = request.form.get('created_by')
+
+    # اعتبارسنجی اولیه
+    if not content or not type_:
+        return jsonify({'message': 'نوع و محتوای لاگ اجباری هستند'}), 400
+
+    try:
+        log_type = RazmkarLogType(type_)  # بررسی اعتبار مقدار enum
+
+        new_log = RazmkarLog(
+            razmkar_id=razmkar_id,
+            type=log_type,
+            content=content,
+            created_by=created_by
+        )
+
+        db.session.add(new_log)
+        db.session.commit()
+
+        return jsonify({'message': '✅ لاگ با موفقیت ثبت شد'}), 200
+
+    except ValueError:
+        return jsonify({'message': '❌ نوع لاگ نامعتبر است'}), 400
+
+    except Exception as e:
+        return jsonify({'message': f'❌ خطای داخلی: {str(e)}'}), 500
+
+
+@razmkar_bp.route('/log/<int:log_id>/edit', methods=['POST'])
+def edit_log(log_id):
+    log = RazmkarLog.query.get_or_404(log_id)
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return jsonify({'message': 'درخواست نامعتبر'}), 400
+
+    try:
+        log.content = request.form.get('content')
+        log.created_by = request.form.get('created_by')
+        log.type = RazmkarLogType(request.form.get('type'))
+        db.session.commit()
+        return jsonify({'message': '✅ لاگ با موفقیت ویرایش شد'})
+    except Exception as e:
+        return jsonify({'message': f'❌ خطا: {str(e)}'}), 500
+
+
+@razmkar_bp.route('/log/<int:log_id>/delete', methods=['POST'])
+def delete_log(log_id):
+    log = RazmkarLog.query.get_or_404(log_id)
+    db.session.delete(log)
+    db.session.commit()
+    return jsonify({'message': '🗑 لاگ حذف شد'})

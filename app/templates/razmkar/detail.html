@@ -13,17 +13,33 @@
   {% endfor %}
   <span>{{ razmkar.mission }}</span>
 </p>
-    <h2>{{ razmkar.mission }}</h2>
+    <h2>{{ razmkar.mission }}  <button onclick="openEditRazmkarPopup()" 
+        style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0;">
+  ✏️
+</button></h2>
     <p>{{ razmkar.note or "توضیحی وارد نشده" }}</p>
 
     <div id="status-section" class="mb-3">
       <label>وضعیت:</label>
-      <select id="status-select" class="form-select" data-task-id="{{ razmkar.id }}">
-        <option value="pending" {{ 'selected' if razmkar.status.name == 'pending' else '' }}>پیش نویس</option>
-        <option value="in_progress" {{ 'selected' if razmkar.status.name == 'in_progress' else '' }}>درحال انجام</option>
-        <option value="done" {{ 'selected' if razmkar.status.name == 'done' else '' }}>انجام شده</option>
-        <option value="cancelled" {{ 'selected' if razmkar.status.name == 'cancelled' else '' }}>لغو</option>
-      </select>
+      
+{# تعریف رنگ وضعیت‌ها برای استایل انتخاب‌شده #}
+{% set status_color = {
+  'pending': '#888',
+  'in_progress': '#007bff',
+  'done': 'green',
+  'cancelled': 'red'
+} %}
+
+<select id="status-select" data-task-id="{{ razmkar.id }}"
+        style="background: none; border: none; appearance: none; padding: 0.3rem; font-size: 1rem; cursor: pointer; color: {{ status_color.get(razmkar.status.name, '#333') }};;">
+  <option value="pending" style="color: #888;" {{ 'selected' if razmkar.status.name == 'pending' else '' }}>پیش‌نویس</option>
+  <option value="in_progress" style="color: #007bff;" {{ 'selected' if razmkar.status.name == 'in_progress' else '' }}>در حال انجام</option>
+  <option value="done" style="color: green;" {{ 'selected' if razmkar.status.name == 'done' else '' }}>انجام شده</option>
+  <option value="cancelled" style="color: red;" {{ 'selected' if razmkar.status.name == 'cancelled' else '' }}>لغو</option>
+</select>
+
+
+
       <small id="status-message" class="text-success" style="display:none;">✔ وضعیت به‌روزرسانی شد.</small>
     </div>
 
@@ -31,122 +47,241 @@
       <p>تاریخ انجام: {{ razmkar.due_date | to_jalali | to_persian_number }}</p>
     {% endif %}
     <p>ایجاد شده: {{ razmkar.created_at | time_since | to_persian_number }}</p>
-    <button onclick="openEditRazmkarPopup()">✏️</button>
+   
   </section>
 
   <hr>
 
-  <section>
-    <h3>لاگ‌های ماموریت</h3>
-    <ul>
-      {% for log in razmkar.logs %}
-        <li>
-          <strong>{{ log.created_at | to_jalali_with_time | to_persian_number }}</strong> –
-          {{ log.type.value }} –
-          {{ log.content or "" }}
-          {% if log.created_by %}(ثبت‌کننده: {{ log.created_by }}){% endif %}
+<section style="margin-top: 2rem;">
+  <h3 style="margin-bottom: 1rem; font-size: 1.2rem;">لاگ‌های ماموریت</h3>
+  
+  <ul style="list-style: none; padding: 0; margin: 0;">
+    {% for log in razmkar.logs %}
+      <li style="padding: 0.6rem 0.3rem; margin-bottom: 0.3rem; border-bottom: 1px solid #eee; font-size: 0.95rem; color: #333;">
+        
+        <!-- تاریخ و نوع لاگ - کوچک و کم‌رنگ -->
+        <div style="font-size: 0.75rem; color: #999; margin-bottom: 0.2rem;">
+          {{ log.created_at | to_jalali_with_time | to_persian_number }} – 
+          {{ log.type.value }}
+          {% if log.created_by %}
+            <span style="font-size: 0.7rem;">( {{ log.created_by }})</span>
+          {% endif %}
+        </div>
+
+        <!-- محتوای لاگ + دکمه ویرایش -->
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <div style="flex: 1;">
+            {{ log.content or "" }}
+          </div>
+          <button
+            class="edit-log-btn"
+            data-log-id="{{ log.id }}"
+            data-content="{{ log.content | escape }}"
+            data-type="{{ log.type.value }}"
+            data-created-by="{{ log.created_by | default('') | escape }}"
+            title="ویرایش لاگ"
+            style="background: none; border: none; font-size: 1rem; cursor: pointer; color: #888;">
+            ✏️
+          </button>
+        </div>
+
+      </li>
+    {% else %}
+      <li style="color: #888; padding: 0.8rem;">هنوز لاگی ثبت نشده است.</li>
+    {% endfor %}
+  </ul>
+
+  <div style="margin-top: 1rem;">
+    <button onclick="openLogPopup()"
+            style="padding: 0.4rem 1rem; border: none; border-radius: 6px; background-color: #007bff; color: white; cursor: pointer;">
+      ➕ افزودن لاگ
+    </button>
+  </div>
+</section>
+
+
+  <hr>
+
+<section style="margin-top: 2rem;">
+  <h3 style="margin-bottom: 1rem; font-size: 1.2rem;">زیرماموریت‌ها</h3>
+
+  {% if razmkar.children %}
+    <ul style="list-style: none; padding: 0; margin: 0;">
+      {% for child in razmkar.children %}
+        <li style="padding: 0.6rem 0.3rem; margin-bottom: 0.3rem; border-bottom: 1px solid #eee; font-size: 0.95rem;">
+          
+          <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=child.id) }}" style="text-decoration: none; color: #007bff;">
+            {{ child.mission }}
+          </a>
+          
+          <span style="font-size: 0.75rem; color: #666; margin-right: 0.5rem;">
+            {{ child.status.value }}
+          </span>
+
+          {% if child.due_date %}
+            <span style="font-size: 0.75rem; color: #999;">
+              – {{ child.due_date | to_jalali | to_persian_number }}
+            </span>
+          {% endif %}
         </li>
-      {% else %}
-        <li>هنوز لاگی ثبت نشده است.</li>
       {% endfor %}
     </ul>
-    <button onclick="openLogPopup()">➕ افزودن لاگ</button>
-  </section>
+  {% else %}
+    <p style="color: #777;">زیرماموریتی ثبت نشده است.</p>
+  {% endif %}
 
-  <hr>
-
-  <section>
-    <h3>زیرماموریت‌ها</h3>
-    {% if razmkar.children %}
-      <ul>
-        {% for child in razmkar.children %}
-          <li>
-            <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=child.id) }}">
-              {{ child.mission }} – {{ child.status.value }}
-            </a>
-            {% if child.due_date %}
-              ({{ child.due_date | to_jalali | to_persian_number }})
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>زیرماموریتی ثبت نشده است.</p>
-    {% endif %}
-    <button onclick="openChildPopup()">➕ افزودن ماموریت </button>
-    
-  </section>
-
-
- <!-- پاپ‌آپ افزودن لاگ -->
-  <div id="log-popup" class="popup-overlay" style="display:none;">
-    <div class="popup">
-      <h3>افزودن لاگ جدید</h3>
-      <form id="log-form">
-        <input type="hidden" name="razmkar_id" value="{{ razmkar.id }}">
-        <textarea name="content" placeholder="محتوای لاگ..." required></textarea><br>
-        <input name="created_by" placeholder="ثبت‌کننده..."><br>
-        <select name="type" required>
-          <option value="">نوع لاگ</option>
-          <option value="note">یادداشت</option>
-          <option value="action">اقدام</option>
-          <option value="followup">پیگیری</option>
-          <option value="reminder">یادآوری</option>
-          <option value="status_change">تغییر وضعیت</option>
-          <option value="file_upload">بارگذاری فایل</option>
-        </select><br>
-        <button type="submit">ذخیره</button>
-        <button type="button" onclick="closeLogPopup()">لغو</button>
-      </form>
-    </div>
+  <div style="margin-top: 1rem;">
+    <button onclick="openChildPopup()"
+            style="padding: 0.4rem 1rem; border: none; border-radius: 6px; background-color: #28a745; color: white; cursor: pointer;">
+      ➕ افزودن ماموریت
+    </button>
   </div>
+</section>
 
-  <!-- پاپ‌آپ افزودن زیرماموریت -->
-  <div id="child-razmkar-popup" class="popup-overlay" style="display:none;">
-    <div class="popup">
-      <h3>افزودن ماموریت زیرمجموعه</h3>
-      <form id="child-razmkar-form">
-        <input type="hidden" name="project_id" value="{{ razmkar.project.id }}">
-        <input type="hidden" name="parent_id" value="{{ razmkar.id }}">
-        <input name="mission" placeholder="شرح ماموریت" required><br>
-        <textarea name="note" placeholder="توضیحات"></textarea><br>
-        <input name="due_date" type="date"><br>
-        <select name="status" required>
-          <option value="">وضعیت ماموریت</option>
-          <option value="pending">پیش‌نویس</option>
-          <option value="in_progress">در حال انجام</option>
-          <option value="done">انجام شده</option>
-          <option value="cancelled">لغو</option>
-        </select><br>
-        <button type="submit">ذخیره</button>
-        <button type="button" onclick="closeChildPopup()">لغو</button>
-      </form>
-    </div>
+
+
+<!-- پاپ‌آپ افزودن لاگ -->
+<div id="log-popup" class="popup-overlay" style="display: none;">
+  <div class="popup" style="width: 100%; max-width: 400px; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem;">افزودن لاگ جدید</h3>
+    
+    <form id="log-form">
+      <input type="hidden" name="razmkar_id" value="{{ razmkar.id }}">
+
+      <label style="display: block; margin-bottom: 0.3rem;">محتوای لاگ:</label>
+      <textarea name="content" placeholder="..." required style="width: 100%; height: 100px; resize: vertical; padding: 0.5rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;"></textarea>
+
+      <label style="display: block; margin-bottom: 0.3rem;">نوع لاگ:</label>
+      <select name="type" required style="width: 100%; padding: 0.4rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;">
+        <option value="">انتخاب کنید...</option>
+  <option value="یادداشت">یادداشت</option>
+  <option value="فعالیت">فعالیت</option>
+  <option value="پیگیری">پیگیری</option>
+  <option value="یادآوری">یادآوری</option>
+  <option value="تغیر وضعیت">تغیر وضعیت</option>
+      </select>
+
+      <label style="display: block; margin-bottom: 0.3rem;">ثبت‌کننده:</label>
+      <input name="created_by" placeholder="..." style="width: 100%; padding: 0.4rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;">
+
+      <div style="display: flex; justify-content: space-between; gap: 0.5rem;">
+        <button type="submit" style="flex: 1; padding: 0.5rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">ذخیره</button>
+        <button type="button" onclick="closeLogPopup()" style="flex: 1; padding: 0.5rem; background-color: #ddd; color: #333; border: none; border-radius: 5px; cursor: pointer;">لغو</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- پاپ‌آپ ویرایش لاگ -->
+<div id="edit-log-popup" class="popup-overlay" style="display: none;">
+  <div class="popup" style="width: 100%; max-width: 400px; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem;">ویرایش لاگ</h3>
+
+    <form id="edit-log-form">
+      <input type="hidden" name="log_id" id="edit-log-id">
+
+      <label style="display: block; margin-bottom: 0.3rem;">محتوا:</label>
+      <textarea name="content" id="edit-log-content" style="width: 100%; height: 100px; resize: vertical; padding: 0.5rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;"></textarea>
+
+      <label style="display: block; margin-bottom: 0.3rem;">نوع لاگ:</label>
+      <select name="type" id="edit-log-type" style="width: 100%; padding: 0.4rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;">
+        <option value="">انتخاب کنید...</option>
+        <option value="یادداشت">یادداشت</option>
+        <option value="فعالیت">فعالیت</option>
+        <option value="پیگیری">پیگیری</option>
+        <option value="یادآوری">یادآوری</option>
+        <option value="تغیر وضعیت">تغیر وضعیت</option>
+      </select>
+
+      <label style="display: block; margin-bottom: 0.3rem;">ثبت‌کننده:</label>
+      <input type="text" name="created_by" id="edit-log-created-by" style="width: 100%; padding: 0.4rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;">
+
+      <div style="display: flex; justify-content: space-between; gap: 0.5rem; margin-top: 1rem;">
+        <button type="submit" style="flex: 1; padding: 0.5rem; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">ذخیره</button>
+        <button type="button" onclick="deleteLog()" style="flex: 1; padding: 0.5rem; background-color: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">حذف</button>
+        <button type="button" onclick="closeEditLogPopup()" style="flex: 1; padding: 0.5rem; background-color: #ddd; color: #333; border: none; border-radius: 5px; cursor: pointer;">لغو</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+
+
+ <!-- پاپ‌آپ افزودن ماموریت زیرمجموعه -->
+<div id="child-razmkar-popup" class="popup-overlay" style="display: none;">
+  <div class="popup" style="width: 100%; max-width: 400px; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem;">افزودن زیرماموریت</h3>
+
+    <form id="child-razmkar-form">
+      <input type="hidden" name="project_id" value="{{ razmkar.project.id }}">
+      <input type="hidden" name="parent_id" value="{{ razmkar.id }}">
+
+      <label style="display: block; margin-bottom: 0.3rem;">شرح ماموریت:</label>
+      <input name="mission" placeholder="..." required style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;">
+
+      <label style="display: block; margin-bottom: 0.3rem;">توضیحات:</label>
+      <textarea name="note" placeholder="..." style="width: 100%; height: 80px; padding: 0.5rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;"></textarea>
+
+      <label style="display: block; margin-bottom: 0.3rem;">تاریخ انجام:</label>
+      <input name="due_date" type="date" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;">
+
+      <label style="display: block; margin-bottom: 0.3rem;">وضعیت:</label>
+      <select name="status" required style="width: 100%; padding: 0.4rem; margin-bottom: 1.2rem; border-radius: 5px; border: 1px solid #ccc;">
+        <option value="">انتخاب وضعیت...</option>
+        <option value="pending">پیش‌نویس</option>
+        <option value="in_progress">در حال انجام</option>
+        <option value="done">انجام شده</option>
+        <option value="cancelled">لغو</option>
+      </select>
+
+      <div style="display: flex; justify-content: space-between; gap: 0.5rem;">
+        <button type="submit" style="flex: 1; padding: 0.5rem; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">ذخیره</button>
+        <button type="button" onclick="closeChildPopup()" style="flex: 1; padding: 0.5rem; background-color: #ddd; color: #333; border: none; border-radius: 5px; cursor: pointer;">لغو</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 
    
 
   </div>
    <!-- پاپ‌آپ ویرایش رزمکار -->
-<div id="edit-razmkar-popup" class="popup-overlay" style="display:none;">
-  <div class="popup">
-    <h3>ویرایش ماموریت</h3>
+<div id="edit-razmkar-popup" class="popup-overlay" style="display: none;">
+  <div class="popup" style="width: 100%; max-width: 400px; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
+    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem;">ویرایش ماموریت</h3>
+
     <form id="edit-razmkar-form">
       <input type="hidden" name="razmkar_id" value="{{ razmkar.id }}">
-      <input name="mission" value="{{ razmkar.mission }}" placeholder="عنوان ماموریت" required><br>
-      <textarea name="note" placeholder="توضیح">{{ razmkar.note }}</textarea><br>
-      <input name="due_date" type="date" value="{{ razmkar.due_date.strftime('%Y-%m-%d') if razmkar.due_date }}"><br>
-      <select name="status" required>
-        <option value="pending" {{ 'selected' if razmkar.status.name == 'pending' else '' }}>پیش‌ نویس</option>
+
+      <label style="display: block; margin-bottom: 0.3rem;">عنوان ماموریت:</label>
+      <input name="mission" value="{{ razmkar.mission }}" placeholder="..." required style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;">
+
+      <label style="display: block; margin-bottom: 0.3rem;">توضیحات:</label>
+      <textarea name="note" placeholder="..." style="width: 100%; height: 80px; padding: 0.5rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;">{{ razmkar.note }}</textarea>
+
+      <label style="display: block; margin-bottom: 0.3rem;">تاریخ انجام:</label>
+      <input name="due_date" type="date" value="{{ razmkar.due_date.strftime('%Y-%m-%d') if razmkar.due_date }}" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #ccc;">
+
+      <label style="display: block; margin-bottom: 0.3rem;">وضعیت:</label>
+      <select name="status" required style="width: 100%; padding: 0.4rem; margin-bottom: 1.2rem; border-radius: 5px; border: 1px solid #ccc;">
+        <option value="pending" {{ 'selected' if razmkar.status.name == 'pending' else '' }}>پیش‌نویس</option>
         <option value="in_progress" {{ 'selected' if razmkar.status.name == 'in_progress' else '' }}>در حال انجام</option>
         <option value="done" {{ 'selected' if razmkar.status.name == 'done' else '' }}>انجام شده</option>
-        <option value="cancelled" {{ 'selected' if razmkar.status.name == 'cancelled' else '' }}>لغو</option>
-      </select><br>
-      <button type="submit">ذخیره تغییرات</button>
-      <button type="button" onclick="deleteRazmkar({{ razmkar.id }})" class="btn-danger">🗑 حذف</button>
-      <button type="button" onclick="closeEditRazmkarPopup()">لغو</button>
+        <option value="cancelled" {{ 'selected' if razmkar.status.name == 'cancelled' else '' }}>لغو شده</option>
+      </select>
+
+      <div style="display: flex; justify-content: space-between; gap: 0.5rem;">
+        <button type="submit" style="flex: 1; padding: 0.5rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">ذخیره</button>
+        <button type="button" onclick="deleteRazmkar({{ razmkar.id }})" style="flex: 1; padding: 0.5rem; background-color: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">🗑 حذف</button>
+        <button type="button" onclick="closeEditRazmkarPopup()" style="flex: 1; padding: 0.5rem; background-color: #ddd; color: #333; border: none; border-radius: 5px; cursor: pointer;">لغو</button>
+      </div>
     </form>
   </div>
 </div>
+
   {% endblock %}
 
 {% block scripts %}
@@ -192,29 +327,34 @@ function closeChildPopup() {
 
 <script>
 
-
 document.getElementById('log-form').addEventListener('submit', function (e) {
   e.preventDefault();
 
   const formData = new FormData(this);
   const taskId = formData.get('razmkar_id');
 
-  fetch(`/razmkar/${taskId}`, {
+  fetch(`/razmkar/${taskId}/add-log`, { // ← آدرس مناسب خودت رو وارد کن
     method: 'POST',
     headers: {
-      'X-Requested-With': 'XMLHttpRequest'
+      'X-Requested-With': 'XMLHttpRequest' // OK
+      // 'Content-Type': حذف شود
     },
     body: formData
   })
-  .then(response => response.json())
+  .then(response => {
+    if (!response.ok) {
+      throw new Error("خطا در ارتباط با سرور");
+    }
+    return response.json();
+  })
   .then(data => {
-    alert(data.message);
+    alert(data.message || "✅ لاگ ثبت شد");
     closeLogPopup();
-    location.reload(); // یا با JS اضافه کردن لاگ بدون reload انجام بشه
+    location.reload();
   })
   .catch(error => {
     alert("❌ خطا در ثبت لاگ");
-    console.error(error);
+    console.error("Log Error:", error);
   });
 });
 </script>
@@ -295,4 +435,91 @@ document.getElementById('child-razmkar-form').addEventListener('submit', functio
 
 
   </script>
+
+
+
+<script>
+// باز کردن فرم و پر کردن اطلاعات
+function openEditLogPopup(id, content, type, created_by) {
+  document.getElementById("edit-log-id").value = id;
+  document.getElementById("edit-log-content").value = content;
+  document.getElementById("edit-log-created-by").value = created_by;
+
+  // انتخاب گزینه درست در سلکت
+  const typeSelect = document.getElementById("edit-log-type");
+  typeSelect.value = type.trim();  // ساده‌تر و دقیق‌تر از حلقه
+
+  document.getElementById("edit-log-popup").style.display = "flex";
+}
+
+function closeEditLogPopup() {
+  document.getElementById("edit-log-popup").style.display = "none";
+}
+
+// فعال‌سازی دکمه‌های ویرایش
+document.querySelectorAll('.edit-log-btn').forEach(button => {
+  button.addEventListener('click', function () {
+    const id = this.dataset.logId;
+    const content = this.dataset.content;
+    const type = this.dataset.type;
+    const createdBy = this.dataset.createdBy;
+    openEditLogPopup(id, content, type, createdBy);
+  });
+});
+
+// ارسال فرم ویرایش
+document.getElementById("edit-log-form").addEventListener("submit", function (e) {
+  e.preventDefault();
+
+  const logId = document.getElementById("edit-log-id").value;
+  const formData = new FormData(this);
+
+  fetch(`/razmkar/log/${logId}/edit`, {
+    method: "POST",
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    body: formData
+  })
+  .then(response => {
+    if (!response.ok) throw new Error("خطا در پاسخ سرور");
+    return response.json();
+  })
+  .then(data => {
+    alert(data.message || "✅ ویرایش انجام شد");
+    closeEditLogPopup();
+    location.reload();
+  })
+  .catch(error => {
+    alert("❌ خطا در ویرایش لاگ");
+    console.error("Edit Log Error:", error);
+  });
+});
+
+// حذف لاگ
+function deleteLog() {
+  const logId = document.getElementById("edit-log-id").value;
+
+  if (!confirm("آیا از حذف این لاگ مطمئن هستید؟")) return;
+
+  fetch(`/razmkar/log/${logId}/delete`, {
+    method: "POST",
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(response => {
+    if (!response.ok) throw new Error("خطا در حذف لاگ");
+    return response.json();
+  })
+  .then(data => {
+    alert(data.message || "✅ لاگ حذف شد");
+    closeEditLogPopup();
+    location.reload();
+  })
+  .catch(error => {
+    alert("❌ خطا در حذف لاگ");
+    console.error("Delete Log Error:", error);
+  });
+}
+</script>
+
+
+
 {% endblock %}

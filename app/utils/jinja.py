@@ -100,3 +100,6 @@ def highlight_tags(text):
     escaped = escape(text)
     highlighted = re.sub(r'#\w[\w\d_آ-ی-]*', replacer, escaped)
     return Markup(highlighted)
+
+
+

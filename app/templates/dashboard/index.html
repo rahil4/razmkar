@@ -6,17 +6,40 @@
 
 {% block content %}
 <style>
-  section h2 {
-    margin-top: 2rem;
-    font-size: 1.1rem;
+  .tabs {
+    display: flex;
     border-bottom: 1px solid #eee;
-    padding-bottom: 0.3rem;
-    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+
+  .tab-button {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-weight: bold;
+    color: #666;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .tab-button.active {
+    color: black;
+    border-bottom: 2px solid #007bff;
+  }
+
+  .tab-content {
+    display: none;
+  }
+
+  .tab-content.active {
+    display: block;
   }
 
   ul.task-list {
-    padding: 0;
     list-style: none;
+    padding: 0;
+    margin: 0;
   }
 
   ul.task-list li {
@@ -26,8 +49,8 @@
   }
 
   .task-meta {
-    color: #888;
     font-size: 0.8rem;
+    color: #888;
   }
 
   .status-label {
@@ -45,8 +68,14 @@
   .status.cancelled { background-color: #f8d7da; color: #721c24; }
 </style>
 
-<section>
-  <h2>پروژه‌های فعال</h2>
+<div class="tabs">
+  <button class="tab-button active" onclick="showTab(0)">پروژه‌های فعال</button>
+  <button class="tab-button" onclick="showTab(1)">با تأخیر</button>
+  <button class="tab-button" onclick="showTab(2)">بدون زمان‌بندی</button>
+  <button class="tab-button" onclick="showTab(3)">نزدیک به موعد</button>
+</div>
+
+<div class="tab-content active">
   {% if active_projects %}
     <ul class="task-list">
       {% for project in active_projects %}
@@ -60,10 +89,9 @@
   {% else %}
     <p>پروژه فعالی یافت نشد.</p>
   {% endif %}
-</section>
+</div>
 
-<section>
-  <h2>ماموریت‌های نیازمند اقدام (با تأخیر)</h2>
+<div class="tab-content">
   {% if pending_razmkars %}
     <ul class="task-list">
       {% for rk in pending_razmkars %}
@@ -74,7 +102,7 @@
           <div class="task-meta">
             <span class="status-label {{ rk.status.name }}">{{ rk.status.value }}</span>
             {% if rk.due_date %}
-              <span>تاریخ: {{ rk.due_date | to_jalali | to_persian_number }}</span>
+              <span>  {{ rk.due_date | to_jalali | to_persian_number }}</span>
             {% endif %}
           </div>
         </li>
@@ -83,10 +111,9 @@
   {% else %}
     <p>ماموریت عقب‌افتاده‌ای یافت نشد.</p>
   {% endif %}
-</section>
+</div>
 
-<section>
-  <h2>ماموریت‌های بدون زمان‌بندی</h2>
+<div class="tab-content">
   {% if unscheduled_razmkars %}
     <ul class="task-list">
       {% for rk in unscheduled_razmkars %}
@@ -104,10 +131,9 @@
   {% else %}
     <p>همه‌ی ماموریت‌ها زمان‌بندی دارند.</p>
   {% endif %}
-</section>
+</div>
 
-<section>
-  <h2>ماموریت‌های نزدیک به موعد</h2>
+<div class="tab-content">
   {% if upcoming_razmkars %}
     <ul class="task-list">
       {% for rk in upcoming_razmkars %}
@@ -125,5 +151,20 @@
   {% else %}
     <p>هیچ ماموریتی در ۷ روز آینده وجود ندارد.</p>
   {% endif %}
-</section>
+</div>
+
+<script>
+  function showTab(index) {
+    const tabs = document.querySelectorAll('.tab-content');
+    const buttons = document.querySelectorAll('.tab-button');
+
+    tabs.forEach((tab, i) => {
+      tab.classList.toggle('active', i === index);
+    });
+
+    buttons.forEach((btn, i) => {
+      btn.classList.toggle('active', i === index);
+    });
+  }
+</script>
 {% endblock %}
