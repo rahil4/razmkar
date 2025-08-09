@@ -117,16 +117,27 @@ def create_project():
 
 @projects_bp.route('/<int:project_id>/edit', methods=['POST'])
 def edit_project(project_id):
-    project = Project.query.get_or_404(project_id)
     if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
-        return "⛔ درخواست نامعتبر", 400
+        return jsonify(message="⛔ درخواست نامعتبر"), 400
 
-    project.client_name = request.form.get('client_name')
-    project.goal = request.form.get('goal')
-    project.status = ProjectStatus[request.form.get('status')]
+    project = Project.query.get_or_404(project_id)
+
+    client_name = (request.form.get('client_name') or '').strip()
+    goal = (request.form.get('goal') or '').strip()
+    status_in = request.form.get('status')
+
+    if client_name:
+        project.client_name = client_name
+    if goal:
+        project.goal = goal
+
+    try:
+        project.status = ProjectStatus[status_in]   # status_in مثلاً "in_progress"
+    except Exception:
+        return jsonify(message="وضعیت نامعتبر است"), 400
+
     db.session.commit()
-
-    return jsonify({"message": "✅ پروژه با موفقیت ویرایش شد"})
+    return jsonify(message="✅ پروژه با موفقیت ویرایش شد")
 
 
 @projects_bp.route('/<int:project_id>/add-log', methods=['POST'])

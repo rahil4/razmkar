@@ -7,11 +7,16 @@
 {% block content %}
   <section>
     <p class="breadcrumb" style="font-weight: bold;">
- <strong>[ {{ razmkar.project.client_name }} ]  {{ razmkar.project.goal }} :</strong>
+ <strong>
+  <span style="font-weight: 600; color: #007bff;">[ {{ razmkar.project.client_name }} ]</span>
+  <span style="font-weight: 400; color: #555; margin-right: 0.5rem;">{{ razmkar.project.goal }}</span> 
+</strong>
+
+
   {% for parent in ancestors %}
-    <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=parent.id) }}">{{ parent.mission }}</a> >
+    <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=parent.id) }}"> > {{ parent.mission }}</a> 
   {% endfor %}
-  <span>{{ razmkar.mission }}</span>
+
 </p>
     <h2>{{ razmkar.mission }}  <button onclick="openEditRazmkarPopup()" 
         style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0;">
@@ -107,7 +112,7 @@
 
   {% if razmkar.children %}
     <ul style="list-style: none; padding: 0; margin: 0;">
-      {% for child in razmkar.children %}
+      {% for child in razmkar.children | reverse %}
         <li style="padding: 0.6rem 0.3rem; margin-bottom: 0.3rem; border-bottom: 1px solid #eee; font-size: 0.95rem;">
           
           <a href="{{ url_for('razmkar.razmkar_detail', razmkar_id=child.id) }}" style="text-decoration: none; color: #007bff;">
