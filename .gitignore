@@ -6,6 +6,7 @@ __pycache__/
 *.pyw
 *.pyc
 *.tk
+
 # 🛠 محیط مجازی
 .venv/
 venv/
@@ -50,3 +51,6 @@ htmlcov/
 # 🔄 فایل‌های Alembic
 migrations/versions/*.pyc
 *.backup
+
+
+*.zip
