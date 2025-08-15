@@ -328,3 +328,90 @@ def update_project_status(project_id):
     db.session.commit()
 
     return jsonify({"ok": True, "id": project.id, "new_status": project.status.name})
+
+
+
+# app/projects/routes.py
+
+from flask import jsonify
+from sqlalchemy import or_
+
+try:
+    from app.missions.models import Mission, MissionStatus
+except Exception:
+    Mission = None
+    MissionStatus = None
+
+def _ser_mission(m):
+    title = getattr(m, 'title', None) or getattr(m, 'name', None) or getattr(m, 'subject', None) or f"ماموریت #{m.id}"
+    due = getattr(m, 'due_date', None) or getattr(m, 'deadline', None)
+    assignee = getattr(m, 'assignee', None) or getattr(m, 'owner', None) or getattr(m, 'executor', None)
+    return {
+        "id": m.id,
+        "title": title,
+        "status": m.status.name if getattr(m, 'status', None) else None,
+        "status_label": m.status.value if getattr(m, 'status', None) else None,
+        "due_date": (due.isoformat() if due else None),
+        "assignee": assignee,
+    }
+
+# بالای فایل (ایمپورت‌ها)
+from sqlalchemy import or_
+from app.razmkar.models import Razmkar, RazmkarStatus  # ← این‌ها موجودند
+
+# ...
+
+@projects_bp.route("/<int:project_id>/missions", methods=["GET"])
+def project_missions(project_id):
+    try:
+        project = Project.query.get_or_404(project_id)
+
+        status_q = (request.args.get("status") or "").strip()           # pending|in_progress|done|cancelled
+        q = (request.args.get("q") or "").strip()
+        limit = int(request.args.get("limit") or 20)
+        top_only = request.args.get("top") == "1"                        # اختیاری: فقط سطح بالا
+
+        query = Razmkar.query.filter(Razmkar.project_id == project.id)
+        if top_only and hasattr(Razmkar, "parent_id"):
+            query = query.filter(Razmkar.parent_id.is_(None))
+
+        if q:
+            like = f"%{q}%"
+            # جستجو در mission و note
+            query = query.filter(or_(Razmkar.mission.ilike(like), Razmkar.note.ilike(like)))
+
+        if status_q:
+            try:
+                st_enum = RazmkarStatus[status_q]
+                query = query.filter(Razmkar.status == st_enum)
+            except KeyError:
+                pass
+
+        # مرتب‌سازی: موعد نزدیک‌تر اول (nullها بعد)، سپس id نزولی
+        order_cols = []
+        if hasattr(Razmkar, "due_date"):
+            order_cols.append(Razmkar.due_date.asc())
+        order_cols.append(Razmkar.id.desc())
+        items = query.order_by(*order_cols).limit(limit).all()
+
+        def _ser(m):
+            return {
+                "id": m.id,
+                "title": getattr(m, "mission", f"ماموریت #{m.id}"),
+                "status": m.status.name if m.status else None,          # انگلیسی
+                "status_label": m.status.value if m.status else None,   # فارسی
+                "due_date": (m.due_date.isoformat() if getattr(m, "due_date", None) else None),
+                "assignee": None,  # اگر فیلدی برای مجری دارید، اینجا بگذارید
+            }
+
+        # شمارنده‌ها
+        counters = {}
+        for s in RazmkarStatus:
+            cnt_q = Razmkar.query.filter(Razmkar.project_id == project.id, Razmkar.status == s)
+            if top_only and hasattr(Razmkar, "parent_id"):
+                cnt_q = cnt_q.filter(Razmkar.parent_id.is_(None))
+            counters[s.name] = cnt_q.count()
+
+        return jsonify({"ok": True, "items": [_ser(m) for m in items], "counters": counters})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"server error: {e}"}), 500
