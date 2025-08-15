@@ -1,0 +1,583 @@
+{% extends "base.html" %}
+{% block title %}مدیریت پروژه‌ها{% endblock %}
+{% block header %}پروژه‌ها – کنترل سریع{% endblock %}
+
+{% block content %}
+<style>
+  .controls { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; justify-content:space-between; margin-bottom:.75rem; }
+  .controls .left, .controls .right { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+  .textbox, .select, .btn { border:1px solid #ddd; border-radius:8px; padding:.4rem .6rem; background:#fff; }
+  .btn { cursor:pointer; }
+  .kpis { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.25rem; }
+  .kpis .k { background:#fafafa; border:1px solid #eee; border-radius:10px; padding:.35rem .6rem; font-size:.85rem; }
+  table.projects { width:100%; border-collapse:collapse; }
+  table.projects th, table.projects td { padding:.55rem; border-bottom:1px solid #f0f0f0; text-align:right; }
+  table.projects th { background:#fafafa; font-weight:600; }
+  .pagination { display:flex; gap:.4rem; align-items:center; margin-top:.8rem; }
+  .pagination a, .pagination span { border:1px solid #eee; padding:.25rem .5rem; border-radius:6px; text-decoration:none; color:#333; }
+  .pagination .active { background:#f7f7f7; }
+  .table-row { cursor:pointer; transition: background-color .15s ease, box-shadow .15s ease; }
+  .table-row:hover { background:#f6f9ff; }
+  .table-row:focus-within { background:#eef4ff; outline:0; box-shadow: inset 0 0 0 2px #d7e3ff; }
+
+  /* نشان وضعیت در جدول: فقط دایره رنگی */
+  .status-dot { display:inline-block; width:10px; height:10px; border-radius:999px; margin-left:.35rem; vertical-align:middle; border:1px solid transparent; }
+  .dot-draft     { background:#bdbdbd; border-color:#bdbdbd; }   /* پیش نویس */
+  .dot-active    { background:#0aa678; border-color:#0aa678; }   /* فعال */
+  .dot-waiting   { background:#f0ad00; border-color:#f0ad00; }   /* درانتظار */
+  .dot-completed { background:#1e88e5; border-color:#1e88e5; }   /* اتمام */
+  .dot-cancelled { background:#d32f2f; border-color:#d32f2f; }   /* لغو */
+
+  /* دراپ‌داون ساده در جدول (بدون بردر و بک‌گراند) */
+  .select-plain {
+    border:none !important; background:transparent !important; padding:0 .2rem !important;
+    outline:none !important; box-shadow:none !important; appearance:none; cursor:pointer;
+  }
+  .select-plain:focus { outline:none; box-shadow:none; }
+
+  /* Drawer */
+  .drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,.15); display:none; z-index:999; }
+  .drawer { position:fixed; top:0; right:0; height:100vh; width:420px; max-width:92vw;
+            background:#fff; box-shadow:-2px 0 12px rgba(0,0,0,.08);
+            transform:translateX(100%); transition: transform .25s ease; z-index:1000;
+            display:flex; flex-direction:column; }
+  .drawer.open { transform:translateX(0); }
+  .drawer-header { padding:.9rem 1rem; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+  .drawer-body { padding:.9rem 1rem; overflow:auto; }
+  .muted { color:#666; font-size:.9rem; }
+
+  /* Badge وضعیت داخل Drawer (اختیاری برای رنگ) */
+  .status { padding:.15rem .45rem; border-radius:999px; font-size:.8rem; border:1px solid transparent; }
+  .st-draft { color:#777; background:#f7f7f7; }
+  .st-active { color:#0a6; background:#e8fff5; }
+  .st-waiting { color:#a60; background:#fff6e6; }
+  .st-completed { color:#06c; background:#eaf4ff; }
+  .st-cancelled { color:#b00; background:#ffecec; }
+
+  /* مأموریت‌ها در Drawer */
+  .missions-head { display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin:.6rem 0; }
+  .mchips { display:flex; gap:.4rem; flex-wrap:wrap; }
+  .mchip { background:#f7f7f7; border:1px solid #eee; border-radius:999px; padding:.15rem .5rem; font-size:.8rem; }
+  .mfilter { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; }
+  .mlist { display:flex; flex-direction:column; gap:.45rem; }
+  .mi { border:1px solid #f3f3f3; border-radius:10px; padding:.45rem .6rem; display:flex; align-items:center; justify-content:space-between; }
+  .mi .left { display:flex; align-items:center; gap:.5rem; min-width:0; }
+  .mi .ttl { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mi .meta { color:#666; font-size:.85rem; }
+  .mdot { display:inline-block; width:10px; height:10px; border-radius:999px; border:1px solid transparent; }
+  .mdot-todo        { background:#bdbdbd; border-color:#bdbdbd; }
+  .mdot-in_progress { background:#1e88e5; border-color:#1e88e5; }
+  .mdot-done        { background:#0aa678; border-color:#0aa678; }
+  .mdot-cancelled   { background:#d32f2f; border-color:#d32f2f; }
+  .mi.overdue .ttl { color:#c62828; }
+</style>
+
+<!-- CSRF (در صورت وجود) -->
+<input type="hidden" id="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+
+{# برچسب‌های فارسی برای وضعیت پروژه #}
+{% set STATUS_LABELS = {
+  'draft':'پیش نویس',
+  'active':'فعال',
+  'waiting':'درانتظار',
+  'completed':'اتمام',
+  'cancelled':'لغو'
+} %}
+
+<div class="controls">
+  <form method="get" class="left" id="filtersForm">
+    <input class="textbox" type="text" name="q" value="{{ q }}" placeholder="جستجو (نام/هدف یا #ID)">
+    <select class="select" name="status">
+      <option value="">وضعیت: همه</option>
+      {% for s in ["draft","active","waiting","completed","cancelled"] %}
+        <option value="{{ s }}" {% if status_q==s %}selected{% endif %}>{{ STATUS_LABELS[s] }}</option>
+      {% endfor %}
+    </select>
+    <select class="select" name="sort">
+      {% for s in ["created","id","client","status"] %}
+        <option value="{{ s }}" {% if sort==s %}selected{% endif %}>مرتب‌سازی: {{ s }}</option>
+      {% endfor %}
+    </select>
+    <select class="select" name="order">
+      {% for s in ["desc","asc"] %}
+        <option value="{{ s }}" {% if order==s %}selected{% endif %}>ترتیب: {{ s }}</option>
+      {% endfor %}
+    </select>
+    <select class="select" name="per_page">
+      {% for p in [25,50,100] %}
+        <option value="{{ p }}" {% if per_page==p %}selected{% endif %}>در صفحه: {{ p }}</option>
+      {% endfor %}
+    </select>
+    <label style="display:flex;align-items:center;gap:.3rem;">
+      <input type="checkbox" name="group" value="1" {% if group %}checked{% endif %}>
+      گروه‌بندی وضعیت
+    </label>
+    <input type="hidden" name="page" value="{{ pagination.page if pagination is defined else 1 }}">
+    <button class="btn" type="submit">اعمال</button>
+  </form>
+
+  <div class="right">
+    <div class="kpis">
+      <div class="k">پیش نویس: {{ counters.draft }}</div>
+      <div class="k">فعال: {{ counters.active }}</div>
+      <div class="k">درانتظار: {{ counters.waiting }}</div>
+      <div class="k">اتمام: {{ counters.completed }}</div>
+      <div class="k">لغو: {{ counters.cancelled }}</div>
+    </div>
+  </div>
+</div>
+
+{% if group %}
+  {# گروه‌بندی بر اساس وضعیت #}
+  {% set statuses = ["active","waiting","draft","completed","cancelled"] %}
+  {% for st in statuses %}
+    <h3 style="margin-top:1rem;">{{ STATUS_LABELS[st] }}</h3>
+    <table class="projects">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>نام مشتری</th>
+          <th>هدف</th>
+          <th>تاریخ ایجاد</th>
+          <th>وضعیت</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in projects if p.status.name == st %}
+          <tr class="table-row"
+              data-id="{{ p.id }}"
+              data-client="{{ p.client_name }}"
+              data-goal="{{ p.goal }}"
+              data-status="{{ p.status.name }}"
+              data-status-label="{{ p.status.value }}"
+              data-created="{{ p.created_at | to_jalali | to_persian_number }}"
+              onclick="openRow(this)">
+            <td>{{ p.id }}</td>
+            <td>{{ p.client_name }}</td>
+            <td>{{ p.goal }}</td>
+            <td>{{ p.created_at | to_jalali | to_persian_number }}</td>
+            <td>
+              <span class="status-dot dot-{{ p.status.name }}" title="{{ p.status.value }}" aria-label="{{ p.status.value }}"></span>
+              <select onchange="updateStatus(event, {{ p.id }})"
+                      onclick="event.stopPropagation()"
+                      class="select-plain">
+                {% for s in ["draft","active","waiting","completed","cancelled"] %}
+                  <option value="{{ s }}" {% if p.status.name==s %}selected{% endif %}>{{ STATUS_LABELS[s] }}</option>
+                {% endfor %}
+              </select>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" style="color:#777;">خالی</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endfor %}
+{% else %}
+  {# فهرست تخت #}
+  <table class="projects">
+    <thead>
+      <tr>
+        <th><a href="#" onclick="setSort('id');return false;">ID</a></th>
+        <th><a href="#" onclick="setSort('client');return false;">نام مشتری</a></th>
+        <th>هدف</th>
+        <th><a href="#" onclick="setSort('created');return false;">تاریخ ایجاد</a></th>
+        <th><a href="#" onclick="setSort('status');return false;">وضعیت</a></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in projects %}
+        <tr class="table-row"
+            data-id="{{ p.id }}"
+            data-client="{{ p.client_name }}"
+            data-goal="{{ p.goal }}"
+            data-status="{{ p.status.name }}"
+            data-status-label="{{ p.status.value }}"
+            data-created="{{ p.created_at | to_jalali | to_persian_number }}"
+            onclick="openRow(this)">
+          <td>{{ p.id }}</td>
+          <td>{{ p.client_name }}</td>
+          <td>{{ p.goal }}</td>
+          <td>{{ p.created_at | to_jalali | to_persian_number }}</td>
+          <td>
+            <span class="status-dot dot-{{ p.status.name }}" title="{{ p.status.value }}" aria-label="{{ p.status.value }}"></span>
+            <select onchange="updateStatus(event, {{ p.id }})"
+                    onclick="event.stopPropagation()"
+                    class="select-plain">
+              {% for s in ["draft","active","waiting","completed","cancelled"] %}
+                <option value="{{ s }}" {% if p.status.name==s %}selected{% endif %}>{{ STATUS_LABELS[s] }}</option>
+              {% endfor %}
+            </select>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+
+<div class="pagination">
+  {% if pagination.has_prev %}
+    <a href="#" onclick="setPage({{ pagination.prev_num }});return false;">← قبلی</a>
+  {% else %}
+    <span>← قبلی</span>
+  {% endif %}
+
+  <span class="active">صفحه {{ pagination.page }} از {{ pagination.pages }}</span>
+
+  {% if pagination.has_next %}
+    <a href="#" onclick="setPage({{ pagination.next_num }});return false;">بعدی →</a>
+  {% else %}
+    <span>بعدی →</span>
+  {% endif %}
+</div>
+
+<!-- Drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-header">
+    <div style="min-width:0;">
+      <div id="dTitle" style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+      <div class="muted" id="dMeta"></div>
+    </div>
+    <div style="display:flex; align-items:center; gap:.4rem;">
+      <span class="status" id="dStatusBadge"></span>
+      <select class="select" id="dStatusSelect" onchange="updateStatusInDrawer(event)">
+        {% for s in ["draft","active","waiting","completed","cancelled"] %}
+          <option value="{{ s }}">{{ STATUS_LABELS[s] }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" onclick="closeDrawer()">✕</button>
+    </div>
+  </div>
+  <div class="drawer-body">
+    <div style="margin:.5rem 0;">
+      <a id="dFullLink" class="btn" href="#" target="_blank" rel="noopener">نمایش کامل ↗</a>
+    </div>
+
+    <!-- ===== مأموریت‌ها ===== -->
+    <div class="missions-head">
+      <h3 style="margin:0;">ماموریت‌ها</h3>
+      <div class="mfilter">
+        <select id="mStatusFilter" class="select-plain" onchange="reloadMissions()">
+          <option value="">همه وضعیت‌ها</option>
+          <option value="todo">ثبت‌شده</option>
+          <option value="in_progress">در حال انجام</option>
+          <option value="done">انجام‌شده</option>
+          <option value="cancelled">لغو</option>
+        </select>
+        <input id="mQuery" class="textbox" placeholder="جستجوی مأموریت…" onkeydown="if(event.key==='Enter') reloadMissions()">
+      </div>
+    </div>
+    <div class="mchips" id="mCounters"></div>
+    <div class="mlist" id="mList">
+      <div class="muted">— در حال بارگذاری مأموریت‌ها…</div>
+    </div>
+  </div>
+</aside>
+
+<script>
+  function getCsrf(){ return document.getElementById('csrf_token')?.value || ''; }
+
+  // برچسب‌های فارسی برای وضعیت پروژه (JS)
+  const STATUS_LABELS = {
+    draft: 'پیش نویس',
+    active: 'فعال',
+    waiting: 'درانتظار',
+    completed: 'اتمام',
+    cancelled: 'لغو',
+  };
+
+  // مأموریت‌ها: برچسب‌ها و کلاس دات
+  const MISSION_LABELS = {
+    todo: 'ثبت‌شده',
+    in_progress: 'در حال انجام',
+    done: 'انجام‌شده',
+    cancelled: 'لغو'
+  };
+  const MISSION_DOT_CLASS = {
+    todo: 'mdot-todo',
+    in_progress: 'mdot-in_progress',
+    done: 'mdot-done',
+    cancelled: 'mdot-cancelled'
+  };
+
+  // تغییر وضعیت از داخل جدول
+  function updateStatus(ev, projectId){
+    ev.stopPropagation();
+    const newStatus = ev.target.value;
+    fetch(`/projects/${projectId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-CSRFToken': getCsrf(), 'X-Requested-With':'XMLHttpRequest' },
+      body: JSON.stringify({ status: newStatus })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if(!res.ok) throw new Error(res.error || 'update failed');
+
+      const row = ev.target.closest('tr');
+      const dot = row.querySelector('.status-dot');
+      if (dot){
+        dot.className = `status-dot dot-${res.new_status}`;
+        dot.title = STATUS_LABELS[res.new_status];
+        dot.setAttribute('aria-label', STATUS_LABELS[res.new_status]);
+      }
+      row.dataset.status = res.new_status;
+      row.dataset.statusLabel = STATUS_LABELS[res.new_status];
+
+      // هماهنگ با Drawer اگر باز است
+      const sel = document.getElementById('dStatusSelect');
+      if (sel && sel.dataset.projectId == projectId){
+        const badge = document.getElementById('dStatusBadge');
+        badge.textContent = STATUS_LABELS[res.new_status];
+        badge.className = `status st-${res.new_status}`;
+        sel.value = res.new_status;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert('خطای شبکه یا پاسخ نامعتبر');
+    });
+  }
+
+  // کلیک روی سطر: باز کردن Drawer بدون رفرش + pushState
+  let CURRENT_PROJECT_ID = null;
+
+  function openRow(rowEl){
+    try{
+      const data = {
+        id: rowEl.dataset.id,
+        client: rowEl.dataset.client,
+        goal: rowEl.dataset.goal,
+        status: rowEl.dataset.status,
+        statusLabel: rowEl.dataset.statusLabel,
+        created: rowEl.dataset.created,
+      };
+      const url = new URL(window.location.href);
+      url.searchParams.set('selected', data.id);
+      history.pushState({ selected: data.id }, '', url);
+      openDrawer(data);
+    }catch(e){
+      console.error('openRow error:', e);
+    }
+  }
+
+  function openDrawer(data){
+    CURRENT_PROJECT_ID = data.id;
+
+    const overlay = document.getElementById('drawerOverlay');
+    const drawer  = document.getElementById('drawer');
+    const badge   = document.getElementById('dStatusBadge');
+    const sel     = document.getElementById('dStatusSelect');
+
+    document.getElementById('dTitle').textContent = `${data.client} — ${data.goal}`;
+    document.getElementById('dMeta').textContent  = `ID: ${data.id} · ایجاد: ${data.created}`;
+
+    badge.textContent = STATUS_LABELS[data.status] || data.statusLabel || data.status;
+    badge.className = `status st-${data.status}`;
+
+    sel.value = data.status;
+    sel.dataset.projectId = data.id;
+    drawer.dataset.projectId = data.id; // fallback
+
+    document.getElementById('dFullLink').href = `/projects/${data.id}`;
+
+    overlay.style.display = 'block';
+    drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+
+    // مأموریت‌ها را بارگذاری کن
+    if (typeof reloadMissions === 'function') reloadMissions();
+  }
+
+  function closeDrawer(updateHistory = true){
+    const overlay = document.getElementById('drawerOverlay');
+    const drawer  = document.getElementById('drawer');
+    overlay.style.display = 'none';
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+    if (updateHistory){
+      const url = new URL(window.location.href);
+      url.searchParams.delete('selected');
+      history.replaceState({}, '', url);
+    }
+  }
+
+  // تغییر وضعیت از داخل Drawer
+  function updateStatusInDrawer(ev){
+    const newStatus = ev.target.value;
+    const drawer = document.getElementById('drawer');
+    const projectId = ev.target.dataset.projectId || drawer.dataset.projectId;
+
+    fetch(`/projects/${projectId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-CSRFToken': getCsrf(), 'X-Requested-With':'XMLHttpRequest' },
+      body: JSON.stringify({ status: newStatus })
+    })
+    .then(r=>r.json())
+    .then(res=>{
+      if(!res.ok) throw new Error(res.error || 'update failed');
+
+      const badge = document.getElementById('dStatusBadge');
+      badge.textContent = STATUS_LABELS[res.new_status];
+      badge.className = `status st-${res.new_status}`;
+
+      const row = document.querySelector(`tr.table-row[data-id="${projectId}"]`);
+      if (row){
+        row.dataset.status = res.new_status;
+        row.dataset.statusLabel = STATUS_LABELS[res.new_status];
+        const dot = row.querySelector('.status-dot');
+        if (dot){
+          dot.className = `status-dot dot-${res.new_status}`;
+          dot.title = STATUS_LABELS[res.new_status];
+          dot.setAttribute('aria-label', STATUS_LABELS[res.new_status]);
+        }
+        const rowSelect = row.querySelector('select.select-plain');
+        if (rowSelect) rowSelect.value = res.new_status;
+      }
+    })
+    .catch(err=>{
+      console.error(err);
+      alert('خطای شبکه یا پاسخ نامعتبر');
+    });
+  }
+
+  // حمایت از Back/Forward
+  window.addEventListener('popstate', ()=>{
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get('selected');
+    if (id){
+      const row = document.querySelector(`tr.table-row[data-id="${id}"]`);
+      if (row){
+        openDrawer({
+          id: row.dataset.id,
+          client: row.dataset.client,
+          goal: row.dataset.goal,
+          status: row.dataset.status,
+          statusLabel: row.dataset.statusLabel,
+          created: row.dataset.created,
+        });
+      }
+    } else {
+      closeDrawer(false);
+    }
+  });
+
+  // اگر صفحه با ?selected= لود شد، Drawer را باز کن
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get('selected');
+    if (id){
+      const row = document.querySelector(`tr.table-row[data-id="${id}"]`);
+      if (row){
+        openDrawer({
+          id: row.dataset.id,
+          client: row.dataset.client,
+          goal: row.dataset.goal,
+          status: row.dataset.status,
+          statusLabel: row.dataset.statusLabel,
+          created: row.dataset.created,
+        });
+      }
+    }
+  });
+
+  // سورت و پیجر با فرم
+  function getForm(){ return document.getElementById('filtersForm'); }
+  function setSort(col){
+    const f = getForm();
+    const sortSel  = f.querySelector('select[name=sort]');
+    const orderSel = f.querySelector('select[name=order]');
+    const pageInp  = f.querySelector('input[name=page]');
+    if (sortSel.value === col) {
+      orderSel.value = (orderSel.value === 'asc') ? 'desc' : 'asc';
+    } else {
+      sortSel.value = col;
+      orderSel.value = 'asc';
+    }
+    pageInp.value = 1;
+    f.submit();
+  }
+  function setPage(n){
+    const f = getForm();
+    f.querySelector('input[name=page]').value = n;
+    f.submit();
+  }
+
+  /* ===== Drawer Missions ===== */
+  function reloadMissions(){
+    if (!CURRENT_PROJECT_ID) return;
+    const status = document.getElementById('mStatusFilter').value;
+    const q = document.getElementById('mQuery').value.trim();
+
+    const list = document.getElementById('mList');
+    list.innerHTML = '<div class="muted">— در حال بارگذاری مأموریت‌ها…</div>';
+
+    const url = new URL(`/projects/${CURRENT_PROJECT_ID}/missions`, window.location.origin);
+    if (status) url.searchParams.set('status', status);
+    if (q) url.searchParams.set('q', q);
+    url.searchParams.set('limit', '50');
+
+    fetch(url.toString(), { headers: { 'X-Requested-With':'XMLHttpRequest' }})
+      .then(r => r.json())
+      .then(data => {
+        if (!data.ok) throw new Error(data.error || 'خطا در دریافت مأموریت‌ها');
+        renderMissionCounters(data.counters || {});
+        renderMissionList(data.items || []);
+      })
+      .catch(err => {
+        list.innerHTML = `<div class="muted">خطا: ${err.message}</div>`;
+      });
+  }
+
+  function renderMissionCounters(counters){
+    const el = document.getElementById('mCounters');
+    const order = ['todo','in_progress','done','cancelled'];
+    el.innerHTML = order.map(k => {
+      const c = (k in counters) ? counters[k] : '—';
+      const t = MISSION_LABELS[k] || k;
+      return `<span class="mchip">${t}: ${c}</span>`;
+    }).join('');
+  }
+
+  function renderMissionList(items){
+    const el = document.getElementById('mList');
+    if (!items.length){
+      el.innerHTML = '<div class="muted">مأموریتی یافت نشد.</div>';
+      return;
+    }
+    const today = new Date().toISOString().slice(0,10);
+
+    el.innerHTML = items.map(m => {
+      const code = (m.status || '').toLowerCase();
+      const label = m.status_label || (MISSION_LABELS[code] || code);
+      const dot = MISSION_DOT_CLASS[code] || 'mdot-todo';
+      const due = (m.due_date ? m.due_date.slice(0,10) : '—');
+      const overdue = (m.due_date && code !== 'done' && code !== 'cancelled' && m.due_date.slice(0,10) < today);
+
+      return `
+        <div class="mi ${overdue ? 'overdue' : ''}">
+          <div class="left" title="${label}">
+            <span class="mdot ${dot}"></span>
+            <div>
+              <div class="ttl">${escapeHtml(m.title || ('ماموریت #' + m.id))}</div>
+              <div class="meta">
+                موعد: ${due} ${m.assignee ? '· مجری: ' + escapeHtml(m.assignee) : ''}
+              </div>
+            </div>
+          </div>
+          <div>
+            <a class="btn" href="/missions/${m.id}" target="_blank" rel="noopener">باز کردن ↗</a>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, ch =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])
+    );
+  }
+</script>
+
+{% endblock %}

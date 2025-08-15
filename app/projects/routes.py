@@ -1,56 +1,48 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
-from .models import Project, ProjectStatus, ProjectLog, LogType
+# app/projects/routes.py
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 from app.extensions import db
-from app.razmkar.models import Razmkar
-from flask import Blueprint, render_template, request, jsonify
-
+from app.projects.models import Project, ProjectStatus, ProjectLog, LogType
 
 projects_bp = Blueprint('projects', __name__)
 
-@projects_bp.route('/', methods=["GET", "POST"])
-def list_projects():
-    if request.method == "POST":
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            client_name = request.form.get('client_name')
-            goal = request.form.get('goal')
-            status_value = request.form.get('status', 'draft')
-
-            try:
-                status_enum = ProjectStatus[status_value]
-            except KeyError:
-                return "وضعیت نامعتبر است", 400
-
-            if not client_name or not goal:
-                return "همه فیلدها اجباری هستند", 400
-
-            new_project = Project(client_name=client_name, goal=goal, status=status_enum)
-            db.session.add(new_project)
-            db.session.commit()
-            return "OK", 200
-
-        return "Method Not Allowed", 405
-
-    projects = Project.query.order_by(Project.created_at.desc()).all()
-    return render_template('projects/list.html', projects=projects)
+# ————————————————————————————————————————————————
+# Helper: parse enum safely (accept name or value)
+# ————————————————————————————————————————————————
+def _parse_log_type(s: str) -> LogType:
+    if s is None:
+        raise ValueError("empty type")
+    s = s.strip()
+    # try by name (e.g., "note", "action", ...)
+    try:
+        return LogType[s]
+    except KeyError:
+        pass
+    # try by value (e.g., "یادداشت", "فعالیت", ...)
+    try:
+        return LogType(s)
+    except Exception as e:
+        raise ValueError(f"invalid log type: {s}") from e
 
 
+# ————————————————————————————————————————————————
+# جزئیات سبک – /projects/<id>
+# همچنین پذیرش POST Ajax برای افزودن لاگ
+# ————————————————————————————————————————————————
 @projects_bp.route('/<int:project_id>', methods=['GET', 'POST'])
 def project_detail(project_id):
     project = Project.query.get_or_404(project_id)
 
+    # Ajax add log from detail page
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         note = request.form.get('note')
         type_ = request.form.get('type')
         created_by = request.form.get('created_by')
 
-        print("📥 مقادیر دریافتی از فرم:")
-        print("note:", note)
-        print("type:", type_)
-        print("created_by:", created_by)
+        if not note or not type_:
+            return 'نوع یا متن لاگ نامعتبر است', 400
 
         try:
-            log_type = LogType(type_)  # ← تبدیل به Enum معتبر
-
+            log_type = _parse_log_type(type_)
             log = ProjectLog(
                 project_id=project.id,
                 note=note,
@@ -59,43 +51,46 @@ def project_detail(project_id):
             )
             db.session.add(log)
             db.session.commit()
-
-            print("✅ لاگ با موفقیت ذخیره شد:", log)
             return 'OK', 200
 
         except ValueError:
-            print("❌ مقدار type نامعتبر بود:", type_)
             return 'نوع لاگ نامعتبر است', 400
-
         except Exception as e:
-            print("❌ خطا هنگام ذخیره لاگ:", e)
-            return 'خطای داخلی سرور', 500
+            return f'خطای داخلی سرور: {e}', 500
 
     return render_template('projects/detail.html', project=project)
 
 
+# ————————————————————————————————————————————————
+# حذف پروژه
+# ————————————————————————————————————————————————
 @projects_bp.route('/<int:project_id>/delete', methods=['POST', 'DELETE'])
 def delete_project(project_id):
     project = Project.query.get_or_404(project_id)
-    
     try:
+        # اگر cascade در مدل تنظیم شده باشد، حذف دستی لاگ‌ها لازم نیست،
+        # ولی این خط مشکلی ایجاد نمی‌کند.
         ProjectLog.query.filter_by(project_id=project.id).delete()
         db.session.delete(project)
         db.session.commit()
         flash(f'پروژه "{project.goal}" با موفقیت حذف شد!', 'success')
-    except Exception as e:
+    except Exception:
         db.session.rollback()
         flash('خطا در حذف پروژه رخ داد. لطفاً دوباره تلاش کنید.', 'danger')
-    
-    return redirect(url_for('projects.list_projects'))
+
+    # قبلاً به list_projects می‌رفت؛ الان صفحه‌ی مدیریت اصلی است:
+    return redirect(url_for('projects.manage_projects'))
 
 
+# ————————————————————————————————————————————————
+# ایجاد پروژه
+# ————————————————————————————————————————————————
 @projects_bp.route('/create', methods=['GET', 'POST'])
 def create_project():
     if request.method == "POST":
-        client_name = request.form.get('client_name')
-        goal = request.form.get('goal')
-        status_value = request.form.get('status', 'draft')
+        client_name = (request.form.get('client_name') or '').strip()
+        goal = (request.form.get('goal') or '').strip()
+        status_value = (request.form.get('status') or 'draft').strip()
 
         try:
             status_enum = ProjectStatus[status_value]
@@ -115,6 +110,10 @@ def create_project():
 
     return render_template("projects/create.html")
 
+
+# ————————————————————————————————————————————————
+# ویرایش پروژه (Ajax)
+# ————————————————————————————————————————————————
 @projects_bp.route('/<int:project_id>/edit', methods=['POST'])
 def edit_project(project_id):
     if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
@@ -124,22 +123,26 @@ def edit_project(project_id):
 
     client_name = (request.form.get('client_name') or '').strip()
     goal = (request.form.get('goal') or '').strip()
-    status_in = request.form.get('status')
+    status_in = (request.form.get('status') or '').strip()
 
     if client_name:
         project.client_name = client_name
     if goal:
         project.goal = goal
 
-    try:
-        project.status = ProjectStatus[status_in]   # status_in مثلاً "in_progress"
-    except Exception:
-        return jsonify(message="وضعیت نامعتبر است"), 400
+    if status_in:
+        try:
+            project.status = ProjectStatus[status_in]
+        except Exception:
+            return jsonify(message="وضعیت نامعتبر است"), 400
 
     db.session.commit()
     return jsonify(message="✅ پروژه با موفقیت ویرایش شد")
 
 
+# ————————————————————————————————————————————————
+# افزودن لاگ پروژه (Ajax)
+# ————————————————————————————————————————————————
 @projects_bp.route('/<int:project_id>/add-log', methods=['POST'])
 def add_project_log(project_id):
     if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
@@ -153,8 +156,7 @@ def add_project_log(project_id):
         return "مقدارهای لازم وارد نشده", 400
 
     try:
-        type_enum = LogType[type_]  # ← حالا "note" یا "action" را قبول می‌کند
-
+        type_enum = _parse_log_type(type_)
         new_log = ProjectLog(
             project_id=project_id,
             note=note,
@@ -163,17 +165,16 @@ def add_project_log(project_id):
         )
         db.session.add(new_log)
         db.session.commit()
-
         return jsonify({"message": "لاگ با موفقیت ثبت شد"})
-    
     except ValueError:
         return "❌ نوع لاگ نامعتبر است", 400
-
     except Exception as e:
-        print("❌ خطا در افزودن لاگ پروژه:", e)
         return f"خطای سرور: {e}", 500
 
 
+# ————————————————————————————————————————————————
+# دریافت/ویرایش/حذف لاگ پروژه (Ajax)
+# ————————————————————————————————————————————————
 @projects_bp.route('/log/<int:log_id>')
 def get_log(log_id):
     log = ProjectLog.query.get_or_404(log_id)
@@ -199,9 +200,9 @@ def edit_log(log_id):
         return "❌ اطلاعات ناقص", 400
 
     try:
+        log.type = _parse_log_type(type_)
         log.note = note
         log.created_by = created_by
-        log.type = LogType[type_]
         db.session.commit()
         return jsonify({"message": "ویرایش شد"})
     except Exception as e:
@@ -217,3 +218,113 @@ def delete_log(log_id):
     db.session.delete(log)
     db.session.commit()
     return jsonify({"message": "حذف شد"})
+
+
+# ————————————————————————————————————————————————
+# فهرست/مدیریت پروژه‌ها – /projects
+# پارامترها:
+# q: جستجو در client_name, goal؛ اگر با # شروع شد یعنی ID
+# status: draft|active|waiting|completed|cancelled
+# sort: id|client|created|status  (پیش‌فرض created)
+# order: asc|desc (پیش‌فرض desc)
+# page, per_page: صفحه‌بندی (پیش‌فرض per_page=50)
+# selected: باز کردن Drawer/Modal جزئیات (در قالب استفاده می‌شود)
+# group: 1/0 (اختیاری – گروه‌بندی بر اساس وضعیت)
+# ————————————————————————————————————————————————
+@projects_bp.route("/", methods=["GET"])  # /projects
+def manage_projects():
+    q = (request.args.get("q") or "").strip()
+    status_q = (request.args.get("status") or "").strip()
+    sort = (request.args.get("sort") or "created").strip()
+    order = (request.args.get("order") or "desc").strip()
+    page = int(request.args.get("page") or 1)
+    per_page = int(request.args.get("per_page") or 50)
+    group = request.args.get("group") == "1"
+    selected = request.args.get("selected")
+
+    query = Project.query
+
+    # فیلتر جستجو
+    if q:
+        if q.startswith("#"):
+            try:
+                pid = int(q[1:])
+                query = query.filter(Project.id == pid)
+            except ValueError:
+                pass
+        else:
+            like = f"%{q}%"
+            query = query.filter(
+                (Project.client_name.ilike(like)) | (Project.goal.ilike(like))
+            )
+
+    # فیلتر وضعیت
+    if status_q:
+        try:
+            status_enum = ProjectStatus[status_q]
+            query = query.filter(Project.status == status_enum)
+        except KeyError:
+            pass
+
+    # مرتب‌سازی (بدون نیاز به asc/desc import)
+    sort_map = {
+        "id": Project.id,
+        "client": Project.client_name,
+        "created": Project.created_at,
+        "status": Project.status,
+    }
+    sort_col = sort_map.get(sort, Project.created_at)
+    query = query.order_by(sort_col.asc() if order == "asc" else sort_col.desc())
+
+    # صفحه‌بندی
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    projects = pagination.items
+
+    # شمارنده‌های وضعیت برای KPI کوچک
+    counters = {
+        name: Project.query.filter(Project.status == enum_val).count()
+        for name, enum_val in {
+            "draft": ProjectStatus.draft,
+            "active": ProjectStatus.active,
+            "waiting": ProjectStatus.waiting,
+            "completed": ProjectStatus.completed,
+            "cancelled": ProjectStatus.cancelled,
+        }.items()
+    }
+
+    return render_template(
+        "projects/manage.html",
+        projects=projects,
+        pagination=pagination,
+        q=q,
+        status_q=status_q,
+        sort=sort,
+        order=order,
+        per_page=per_page,
+        group=group,
+        selected=selected,
+        counters=counters,
+    )
+
+
+# ————————————————————————————————————————————————
+# تغییر وضعیت پروژه – Ajax
+# ————————————————————————————————————————————————
+@projects_bp.route("/<int:project_id>/status", methods=["POST"])
+def update_project_status(project_id):
+    data = request.get_json(silent=True) or {}
+    new_status = (data.get("status") or "").strip()
+
+    if not new_status:
+        return jsonify({"ok": False, "error": "status required"}), 400
+
+    try:
+        status_enum = ProjectStatus[new_status]
+    except KeyError:
+        return jsonify({"ok": False, "error": "invalid status"}), 400
+
+    project = Project.query.get_or_404(project_id)
+    project.status = status_enum
+    db.session.commit()
+
+    return jsonify({"ok": True, "id": project.id, "new_status": project.status.name})
