@@ -42,3 +42,21 @@ class ProjectLog(db.Model):
     type = db.Column(db.Enum(LogType), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(100), nullable=True)
+
+
+
+class AppSetting(db.Model):
+    __tablename__ = "app_settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    scope = db.Column(db.String(64), nullable=False, default="global", index=True)  # بعداً می‌تونی user_id بذاری
+    key = db.Column(db.String(128), nullable=False, index=True)
+    value = db.Column(db.Text, nullable=True)  # JSON به صورت رشته
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('scope', 'key', name='uq_app_settings_scope_key'),
+    )
+
+    def __repr__(self):
+        return f"<AppSetting {self.scope}:{self.key}>"
