@@ -275,7 +275,27 @@
     </div>
   </div>
 </aside>
-
+<style>
+  .mcat { display:inline-block; padding:.05rem .4rem; border-radius:999px; font-size:.75rem; border:1px solid transparent; }
+  .mcat-field { background:#eaf7ff; color:#036; border-color:#cfe8ff; }
+  .mcat-adm   { background:#eafff4; color:#064; border-color:#c8f3e0; }
+  .mcat-desk  { background:#fff6db; color:#7a5; border-color:#ffe9a3; }
+  .mcat-unk   { background:#f5f5f5; color:#666; border-color:#eee; }
+</style>
+<script>
+  const CAT_LABELS = {
+    field: 'میدانی',
+    administrative: 'اداری',
+    desk: 'دفتری',
+    unknown: 'نامشخص'
+  };
+  const CAT_CLASS = {
+    field: 'mcat-field',
+    administrative: 'mcat-adm',
+    desk: 'mcat-desk',
+    unknown: 'mcat-unk'
+  };
+</script>
 <script>
   function getCsrf(){ return document.getElementById('csrf_token')?.value || ''; }
 
@@ -503,6 +523,7 @@
     if (status) url.searchParams.set('status', status);
     if (q) url.searchParams.set('q', q);
     url.searchParams.set('limit', '50');
+    url.searchParams.set('with_category', '1'); // ← اضافه شد
 
     fetch(url.toString(), { headers: { 'X-Requested-With':'XMLHttpRequest' }})
       .then(async (r) => {
@@ -535,39 +556,47 @@
   }
 
   function renderMissionList(items){
-    const el = document.getElementById('mList');
-    if (!items.length){
-      el.innerHTML = '<div class="muted">مأموریتی یافت نشد.</div>';
-      return;
-    }
-    const today = new Date().toISOString().slice(0,10);
+  const el = document.getElementById('mList');
+  if (!items.length){
+    el.innerHTML = '<div class="muted">مأموریتی یافت نشد.</div>';
+    return;
+  }
+  const today = new Date().toISOString().slice(0,10);
 
-    el.innerHTML = items.map(m => {
-      const code = (m.status || '').toLowerCase();
-      const label = m.status_label || ({todo:'ثبت‌شده',in_progress:'در حال انجام',done:'انجام‌شده',cancelled:'لغو'}[code] || code);
-      const dotMap = { todo:'mdot-todo', in_progress:'mdot-in_progress', done:'mdot-done', cancelled:'mdot-cancelled' };
-      const dot = dotMap[code] || 'mdot-todo';
-      const due = (m.due_date ? m.due_date.slice(0,10) : '—');
-      const overdue = (m.due_date && code !== 'done' && code !== 'cancelled' && m.due_date.slice(0,10) < today);
+  el.innerHTML = items.map(m => {
+    const code = (m.status || '').toLowerCase();
+    const label = m.status_label || (MISSION_LABELS[code] || code);
+    const dotMap = { todo:'mdot-todo', in_progress:'mdot-in_progress', done:'mdot-done', cancelled:'mdot-cancelled' };
+    const dot = dotMap[code] || 'mdot-todo';
+    const due = (m.due_date ? m.due_date.slice(0,10) : '—');
+    const overdue = (m.due_date && code !== 'done' && code !== 'cancelled' && m.due_date.slice(0,10) < today);
 
-      return `
-        <div class="mi ${overdue ? 'overdue' : ''}">
-          <div class="left" title="${label}">
-            <span class="mdot ${dot}"></span>
-            <div>
-              <div class="ttl">${escapeHtml(m.title || ('ماموریت #' + m.id))}</div>
-              <div class="meta">
-                موعد: ${due}
-              </div>
+    const cat = (m.category || 'unknown');
+    const catLbl = CAT_LABELS[cat] || 'نامشخص';
+    const catClass = CAT_CLASS[cat] || 'mcat-unk';
+
+    const tags = (m.tags && m.tags.length) ? ('#' + m.tags.join(' #')) : '';
+
+    return `
+      <div class="mi ${overdue ? 'overdue' : ''}">
+        <div class="left" title="${label}">
+          <span class="mdot ${dot}"></span>
+          <div>
+            <div class="ttl">${escapeHtml(m.title || ('ماموریت #' + m.id))}</div>
+            <div class="meta">
+              <span class="mcat ${catClass}">${catLbl}</span>
+              &nbsp;· موعد: ${due}
+              ${tags ? ' · ' + escapeHtml(tags) : ''}
             </div>
           </div>
-          <div>
-            <a class="btn" href="/razmkar/${m.id}" target="_blank" rel="noopener">باز کردن ↗</a>
-          </div>
         </div>
-      `;
-    }).join('');
-  }
+        <div>
+          <a class="btn" href="/razmkar/${m.id}" target="_blank" rel="noopener">باز کردن ↗</a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, ch =>

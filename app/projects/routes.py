@@ -58,6 +58,8 @@ def _parse_log_type(s: str) -> LogType:
 @projects_bp.route("/", strict_slashes=False)
 def projects_root():
     # سازگاری با آدرس /projects/ → صفحه مدیریت
+    _ensure_planning_defaults()
+
     return redirect(url_for("projects.manage_projects", **request.args))
 
 
@@ -244,6 +246,7 @@ def delete_log(log_id):
 # ====================================================================
 @projects_bp.route('/manage', methods=['GET'])
 def manage_projects():
+    _ensure_planning_defaults()
     """
     فیلترها و رفتار:
       q: جستجو در client_name, goal (اگر با # شروع شود، ID)
@@ -384,10 +387,12 @@ def project_missions(project_id):
             return jsonify({"ok": False, "error": "Razmkar module not available"}), 500
 
         project = Project.query.get_or_404(project_id)
-        status_q = (request.args.get("status") or "").strip()        # todo|in_progress|done|cancelled
+
+        status_q = (request.args.get("status") or "").strip()        # todo|in_progress|done|cancelled|...
         q_text = (request.args.get("q") or "").strip()
         limit = int(request.args.get("limit") or 20)
         top_only = request.args.get("top") == "1"
+        with_category = (request.args.get("with_category") == "1")
 
         query = Razmkar.query.filter(Razmkar.project_id == project.id)
         if top_only and hasattr(Razmkar, "parent_id"):
@@ -415,7 +420,7 @@ def project_missions(project_id):
         items = query.order_by(*order_cols).limit(limit).all()
 
         def _ser(m):
-            return {
+            base = {
                 "id": m.id,
                 "title": getattr(m, "mission", f"ماموریت #{m.id}"),
                 "status": (m.status.name if getattr(m, "status", None) else None),
@@ -423,6 +428,16 @@ def project_missions(project_id):
                 "due_date": (m.due_date.isoformat() if getattr(m, "due_date", None) else None),
                 "assignee": None,
             }
+            if with_category:
+                texts = [
+                    getattr(m, "mission", "") or "",
+                    getattr(m, "note", "") or "",
+                    getattr(m, "description", "") or "",
+                ]
+                cat, tags = _classify_from_texts(texts)
+                base["category"] = cat  # field|administrative|desk|unknown
+                base["tags"] = tags
+            return base
 
         counters = {}
         if RazmkarStatus:
@@ -492,3 +507,116 @@ def get_setting(key: str, scope: str = "global", fallback: dict | None = None) -
         except Exception:
             return fallback or {}
     return fallback or {}
+
+import re
+
+TAG_MAP_KEY = "tag_category_map"
+CAT_PRIORITY_KEY = "category_priority"
+CAPACITY_BLOCKS_KEY = "capacity_blocks_per_day"
+BLOCK_LABELS_KEY = "block_labels"
+
+_HASHTAG_RX = re.compile(r"#([0-9A-Za-z_\u0600-\u06FF]+)")
+
+_DEFAULT_TAG_MAP = {
+    # اداری
+    "اداره_ثبت": "administrative",
+    "شهرداری": "administrative",
+    "املاک": "administrative",
+    "کمیسیون": "administrative",
+    "نامه": "administrative",
+    "پیگیری": "administrative",
+    # میدانی
+    "نقشه_برداری": "field",
+    "برداشت": "field",
+    "بازدید": "field",
+    "میدانی": "field",
+    # دفتری
+    "گزارش": "desk",
+    "ترسیم": "desk",
+    "نقشه": "desk",
+    "مستندسازی": "desk",
+    "بارگذاری": "desk",
+}
+
+_DEFAULT_CAT_PRIORITY = ["administrative", "field", "desk"]  # ترتیب تقدم در تعارض تگ‌ها
+
+_DEFAULT_BLOCKS = ["AM", "MID", "PM"]
+_DEFAULT_BLOCK_LABELS = {
+    "AM":  {"label":"۷–۱۳","start":"07:00","end":"13:00"},
+    "MID": {"label":"۱۳–۱۶","start":"13:00","end":"16:00"},
+    "PM":  {"label":"۱۶–۱۹","start":"16:00","end":"19:00"},
+}
+
+def _ensure_planning_defaults():
+    """تنظیم پیش‌فرض‌ها اگر قبلاً ذخیره نشده باشند."""
+    if not get_setting(TAG_MAP_KEY):
+        set_setting(TAG_MAP_KEY, _DEFAULT_TAG_MAP)
+    if not get_setting(CAT_PRIORITY_KEY):
+        set_setting(CAT_PRIORITY_KEY, _DEFAULT_CAT_PRIORITY)
+    if not get_setting(CAPACITY_BLOCKS_KEY):
+        set_setting(CAPACITY_BLOCKS_KEY, _DEFAULT_BLOCKS)
+    if not get_setting(BLOCK_LABELS_KEY):
+        set_setting(BLOCK_LABELS_KEY, _DEFAULT_BLOCK_LABELS)
+
+def _extract_tags(text: str) -> list[str]:
+    if not text:
+        return []
+    return [m.group(1) for m in _HASHTAG_RX.finditer(text)]
+
+def _classify_from_texts(texts: list[str]) -> tuple[str, list[str]]:
+    """
+    از مجموعه‌ای از متن‌ها (مثلاً mission، note) تگ‌ها را استخراج و بر اساس واژه‌نامه دسته تعیین می‌کند.
+    خروجی: (category ∈ field|administrative|desk|unknown, tags: List[str])
+    """
+    tag_map: dict = get_setting(TAG_MAP_KEY, fallback=_DEFAULT_TAG_MAP)
+    cat_priority: list = get_setting(CAT_PRIORITY_KEY, fallback=_DEFAULT_CAT_PRIORITY)
+
+    seen = []
+    cats = []
+    for t in texts:
+        for tg in _extract_tags(t):
+            seen.append(tg)
+            if tg in tag_map:
+                cats.append(tag_map[tg])
+
+    if not cats:
+        return "unknown", seen
+
+    # انتخاب بهترین دسته بر اساس اولویت
+    for c in cat_priority:
+        if c in cats:
+            return c, seen
+
+    # اگر هیچ‌کدام در اولویت نبودند، اولی
+    return cats[0], seen
+
+
+@projects_bp.get("/settings/tags")
+def get_tag_settings():
+    _ensure_planning_defaults()
+    return jsonify({
+        "ok": True,
+        "tag_category_map": get_setting(TAG_MAP_KEY, fallback=_DEFAULT_TAG_MAP),
+        "category_priority": get_setting(CAT_PRIORITY_KEY, fallback=_DEFAULT_CAT_PRIORITY),
+        "capacity_blocks_per_day": get_setting(CAPACITY_BLOCKS_KEY, fallback=_DEFAULT_BLOCKS),
+        "block_labels": get_setting(BLOCK_LABELS_KEY, fallback=_DEFAULT_BLOCK_LABELS),
+    })
+
+@projects_bp.post("/settings/tags")
+def post_tag_settings():
+    data = request.get_json(silent=True) or {}
+    tmap = data.get("tag_category_map")
+    prio = data.get("category_priority")
+    blocks = data.get("capacity_blocks_per_day")
+    blabels = data.get("block_labels")
+
+    if isinstance(tmap, dict):
+        set_setting(TAG_MAP_KEY, tmap)
+    if isinstance(prio, list) and all(isinstance(x, str) for x in prio):
+        set_setting(CAT_PRIORITY_KEY, prio)
+    if isinstance(blocks, list) and all(isinstance(x, str) for x in blocks) and len(blocks) >= 1:
+        set_setting(CAPACITY_BLOCKS_KEY, blocks)
+    if isinstance(blabels, dict):
+        set_setting(BLOCK_LABELS_KEY, blabels)
+
+    return jsonify({"ok": True})
