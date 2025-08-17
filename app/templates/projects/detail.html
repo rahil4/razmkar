@@ -3,242 +3,252 @@
 {% block title %}جزئیات پروژه{% endblock %}
 {% block header %}جزئیات پروژه{% endblock %}
 
-{% block content %}
-<section style="margin-bottom: 2rem;">
-  <div style="display: flex; justify-content: space-between; align-items: center;">
-    <h2 style="margin: 0;">
-      <span style="font-weight:600; color:#333;">[ {{ project.client_name }} ]</span>
-      <span style="font-weight:400; color:#555; margin-right:0.5rem;">{{ project.goal }}</span>
-    </h2>
-    <button onclick="openEditPopup()" title="ویرایش پروژه" style="background:none;border:none;cursor:pointer;font-size:1.2rem;">✏️</button>
-  </div>
+{% block extra_head %}
+<style>
+  /* فقط این صفحه */
+  .p-project .status{padding:.15rem .45rem;border-radius:999px;font-size:.85rem;border:1px solid transparent}
+  .p-project .st-draft{color:#777;background:#f7f7f7}
+  .p-project .st-active{color:#0a6;background:#e8fff5}
+  .p-project .st-waiting{color:#a60;background:#fff6e6}
+  .p-project .st-completed{color:#06c;background:#eaf4ff}
+  .p-project .st-cancelled{color:#b00;background:#ffecec}
 
-  <div style="margin-top: 0.5rem; color: #555;">
-    <span>{{ project.created_at | time_since | to_persian_number }}</span>
-    <span style="margin-right: 1rem;">{{ project.status.value }}</span>
-  </div>
-</section>
+  /* لیست لاگ‌ها */
+  .p-project .logs{list-style:none;margin:0;padding:0}
+  .p-project .logs li{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.5rem .75rem;border-bottom:1px solid var(--line)}
+  .p-project .logs li:last-child{border-bottom:0}
+  .p-project .log-meta{color:var(--muted);font-size:.9em;white-space:nowrap}
+  .p-project .log-note strong{font-weight:600}
 
-<hr>
-
-<section>
-  <h3>ماموریت ها</h3>
-  <ul>
-    {% for razmkar in project.razmkars if razmkar.parent_id is none %}
-      {% include 'razmkar/_tree.html' with context %}
-    {% endfor %}
-  </ul>
-  <button class="button-glass" onclick="openRazmkarPopup()">➕ افزودن ماموریت</button>
-</section>
-
-<hr>
-
-<section>
-  <ul id="logs-list" style="font-family: monospace;">
-    {% for log in project.logs | reverse %}
-      <li>
-        <span>
-          {{ log.created_at.strftime('%Y/%m/%d - %H:%M') | to_persian_number }}
-          [{{ log.type.value }}]  <strong>{{ log.note | to_persian_number | highlight_tags }}</strong>
-        </span>
-        <button onclick="editLog({{log.id}})" title="ویرایش لاگ" style="background:none;border:none;cursor:pointer;">✏️</button>
-      </li>
-    {% else %}
-      <li>هنوز لاگی ثبت نشده است.</li>
-    {% endfor %}
-  </ul>
-  <button class="button-glass" onclick="openLogPopup()">➕ افزودن لاگ</button>
-</section>
-
-<!-- پاپ‌آپ افزودن ماموریت -->
-<div id="razmkar-popup" class="popup-overlay" style="display: none;">
-  <div class="popup" style="width: 100%; max-width: 400px; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
-    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem;">افزودن ماموریت جدید</h3>
-
-    <form id="razmkar-form">
-      <input type="hidden" name="project_id" value="{{ project.id }}">
-
-      <label style="display:block; margin-bottom:0.3rem;">شرح ماموریت:</label>
-      <input name="mission" placeholder="..." required
-             style="width:100%; padding:0.5rem; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;">
-
-      <label style="display:block; margin-bottom:0.3rem;">توضیحات:</label>
-      <textarea name="note" rows="4" placeholder="..."
-                style="width:100%; height:100px; resize:vertical; padding:0.5rem; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;"></textarea>
-
-      <label style="display:block; margin-bottom:0.3rem;">تاریخ انجام:</label>
-      <input name="due_date" type="date"
-             style="width:100%; padding:0.5rem; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;">
-
-      <label style="display:block; margin-bottom:0.3rem;">وضعیت:</label>
-      <select name="status" required
-              style="width:100%; padding:0.4rem; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;">
-        <option value="">انتخاب کنید...</option>
-        <option value="pending">پیش‌نویس</option>
-        <option value="in_progress">در حال انجام</option>
-        <option value="done">انجام شده</option>
-        <option value="cancelled">لغو</option>
-      </select>
-
-      <div style="display:flex; justify-content:space-between; gap:0.5rem;">
-        <button type="submit"
-                style="flex:1; padding:0.5rem; background-color:#007bff; color:#fff; border:none; border-radius:5px; cursor:pointer;">
-          ذخیره
-        </button>
-        <button type="button" onclick="closeRazmkarPopup()"
-                style="flex:1; padding:0.5rem; background-color:#ddd; color:#333; border:none; border-radius:5px; cursor:pointer;">
-          لغو
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-<!-- پاپ‌آپ افزودن لاگ پروژه -->
-<div id="log-popup" class="popup-overlay" style="display: none;">
-  <div class="popup" style="width: 100%; max-width: 400px; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
-    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem;">افزودن لاگ پروژه</h3>
-
-    <form id="log-form">
-      <input type="hidden" name="project_id" value="{{ project.id }}">
-
-      <label for="note" style="display:block; margin-bottom:0.3rem;">یادداشت:</label>
-      <textarea name="note" rows="5" placeholder="..." required
-                style="width:100%; padding:0.5rem; font-family:inherit; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;"></textarea>
-
-      <label for="created_by" style="display:block; margin-bottom:0.3rem;">ثبت‌کننده:</label>
-      <input name="created_by" placeholder="نام یا عنوان" value="راهیل"
-             style="width:100%; padding:0.4rem; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;">
-
-      <label for="type" style="display:block; margin-bottom:0.3rem;">نوع لاگ:</label>
-      <select name="type" required
-              style="width:100%; padding:0.4rem; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;">
-        <option value="">انتخاب کنید...</option>
-        <option value="note">یادداشت</option>
-        <option value="action">فعالیت</option>
-        <option value="followup">پیگیری</option>
-        <option value="reminder">یادآوری</option>
-      </select>
-
-      <div style="display:flex; justify-content:space-between; gap:0.5rem;">
-        <button type="submit"
-                style="flex:1; padding:0.5rem; background-color:#007bff; color:#fff; border:none; border-radius:5px; cursor:pointer;">
-          ذخیره
-        </button>
-        <button type="button" onclick="closeLogPopup()"
-                style="flex:1; padding:0.5rem; background-color:#ddd; color:#333; border:none; border-radius:5px; cursor:pointer;">
-          لغو
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-<!-- پاپ‌آپ ویرایش لاگ -->
-<div id="edit-log-popup" class="popup-overlay" style="display: none;">
-  <div class="popup" style="width: 100%; max-width: 400px; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
-    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem;">ویرایش لاگ</h3>
-
-    <form id="edit-log-form">
-      <input type="hidden" name="log_id" id="edit-log-id">
-
-      <label style="display:block; margin-bottom:0.3rem;">توضیح لاگ:</label>
-      <textarea name="note" id="edit-log-note" placeholder="..." required
-                style="width:100%; height:100px; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc; padding:0.5rem;"></textarea>
-
-      <label style="display:block; margin-bottom:0.3rem;">ثبت‌کننده:</label>
-      <input name="created_by" id="edit-log-created-by" placeholder="..."
-             style="width:100%; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc; padding:0.4rem;">
-
-      <label style="display:block; margin-bottom:0.3rem;">نوع لاگ:</label>
-      <select name="type" id="edit-log-type" required
-              style="width:100%; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc; padding:0.4rem;">
-        <option value="">انتخاب کنید...</option>
-        <option value="note">یادداشت</option>
-        <option value="action">فعالیت</option>
-        <option value="followup">پیگیری</option>
-        <option value="reminder">یادآوری</option>
-      </select>
-
-      <div style="display:flex; justify-content:space-between; gap:0.5rem;">
-        <button type="submit"
-                style="flex:1; padding:0.5rem; background-color:#007bff; color:#fff; border:none; border-radius:5px; cursor:pointer;">
-          💾 ذخیره
-        </button>
-        <button type="button" onclick="deleteLog()"
-                style="flex:1; padding:0.5rem; background-color:#c00; color:#fff; border:none; border-radius:5px; cursor:pointer;">
-          🗑️ حذف
-        </button>
-        <button type="button" onclick="closeEditLogPopup()"
-                style="flex:1; padding:0.5rem; background-color:#ddd; color:#333; border:none; border-radius:5px; cursor:pointer;">
-          لغو
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-<!-- پاپ‌آپ ویرایش پروژه -->
-<div id="edit-project-popup" class="popup-overlay" style="display: none;">
-  <div class="popup" style="width: 100%; max-width: 400px; background: #fff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2);">
-    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.2rem;">ویرایش پروژه</h3>
-
-    <form id="edit-project-form">
-      <input type="hidden" name="project_id" value="{{ project.id }}">
-
-      <label style="display:block; margin-bottom:0.3rem;">نام کارفرما:</label>
-      <input name="client_name" value="{{ project.client_name }}"
-             style="width:100%; padding:0.5rem; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;">
-
-      <label style="display:block; margin-bottom:0.3rem;">هدف پروژه:</label>
-      <input name="goal" value="{{ project.goal }}"
-             style="width:100%; padding:0.5rem; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;">
-
-      <label style="display:block; margin-bottom:0.3rem;">وضعیت:</label>
-      <select name="status" required
-              style="width:100%; padding:0.4rem; margin-bottom:1rem; border-radius:5px; border:1px solid #ccc;">
-        <option value="draft"     {{ 'selected' if project.status.name == 'draft' else '' }}>پیش نویس</option>
-        <option value="active"    {{ 'selected' if project.status.name == 'active' else '' }}>فعال</option>
-        <option value="waiting"   {{ 'selected' if project.status.name == 'waiting' else '' }}>در انتظار</option>
-        <option value="completed" {{ 'selected' if project.status.name == 'completed' else '' }}>اتمام</option>
-        <option value="cancelled" {{ 'selected' if project.status.name == 'cancelled' else '' }}>لغو</option>
-      </select>
-
-      <div style="display:flex; justify-content:space-between; gap:0.5rem;">
-        <button type="submit"
-                style="flex:1; padding:0.5rem; background-color:#007bff; color:#fff; border:none; border-radius:5px; cursor:pointer;">
-          ذخیره
-        </button>
-        <button type="button" onclick="closeEditPopup()"
-                style="flex:1; padding:0.5rem; background-color:#ddd; color:#333; border:none; border-radius:5px; cursor:pointer;">
-          لغو
-        </button>
-        <button type="button" onclick="deleteProject()"
-                style="flex:1; padding:0.5rem; background-color:#c00; color:#fff; border:none; border-radius:5px; cursor:pointer;">
-          حذف پروژه
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
+  /* مودال‌ها */
+  .p-project .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.18);display:none;align-items:center;justify-content:center;z-index:999}
+  .p-project .modal{width:100%;max-width:420px;background:#fff;border-radius:12px;box-shadow:0 8px 26px rgba(0,0,0,.15);padding:1rem 1rem 1.1rem}
+  .p-project .modal h3{margin:.2rem 0 1rem;font-size:1.1rem}
+  .p-project .modal .row{margin-bottom:.75rem}
+  .p-project .modal .actions{display:flex;gap:.5rem}
+</style>
 {% endblock %}
 
-{% block scripts %}
-<script>
-  // ---- ابزارهای پاپ‌آپ
-  function openRazmkarPopup(){ const el=document.getElementById('razmkar-popup'); if(el) el.style.display='flex'; }
-  function closeRazmkarPopup(){ const el=document.getElementById('razmkar-popup'); if(el) el.style.display='none'; }
-  function openLogPopup(){ const el=document.getElementById('log-popup'); if(el) el.style.display='flex'; }
-  function closeLogPopup(){ const el=document.getElementById('log-popup'); if(el) el.style.display='none'; }
-  function openEditPopup(){ const el=document.getElementById('edit-project-popup'); if(el) el.style.display='flex'; }
-  function closeEditPopup(){ const el=document.getElementById('edit-project-popup'); if(el) el.style.display='none'; }
-  function closeEditLogPopup(){ const el=document.getElementById('edit-log-popup'); if(el) el.style.display='none'; }
+{% block content %}
+<div class="p-project">
 
-  // ---- فرم افزودن ماموریت
+  <!-- سربرگ پروژه -->
+  <section class="mb-3">
+    <div class="flex items-center justify-between wrap gap-2">
+      <div class="flex items-center gap-2">
+        <h2 class="h2 m-0">
+          <span class="fw-600">[ {{ project.client_name }} ]</span>
+          <span class="fw-400 muted">— {{ project.goal }}</span>
+        </h2>
+        <span class="status st-{{ project.status.name }}">{{ project.status.value }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn" title="ویرایش پروژه" onclick="openEditPopup()">✏️ ویرایش</button>
+        <!-- فرم حذف (ریدایرکت تمیز) -->
+        <form id="delete-project-form" method="post" action="{{ url_for('projects.delete_project', project_id=project.id) }}"></form>
+        <button class="btn btn-danger" onclick="deleteProject()">🗑️ حذف</button>
+      </div>
+    </div>
+    <div class="muted mt-1">
+      <span>{{ project.created_at | time_since | to_persian_number }}</span>
+    </div>
+  </section>
+
+  <!-- مأموریت‌ها -->
+  <section class="card mb-3">
+    <div class="card-body">
+      <div class="flex items-center justify-between wrap gap-2 mb-1">
+        <h3 class="h2 m-0">ماموریت‌ها</h3>
+        <button class="btn btn-primary" onclick="openRazmkarPopup()">➕ افزودن مأموریت</button>
+      </div>
+      <ul class="mt-1">
+        {% for razmkar in project.razmkars if razmkar.parent_id is none %}
+          {% include 'razmkar/_tree.html' with context %}
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  <!-- لاگ‌ها -->
+  <section class="card">
+    <div class="card-body">
+      <div class="flex items-center justify-between wrap gap-2 mb-1">
+        <h3 class="h2 m-0">لاگ‌های پروژه</h3>
+        <button class="btn" onclick="openLogPopup()">➕ افزودن لاگ</button>
+      </div>
+
+      <ul id="logs-list" class="logs">
+        {% for log in project.logs | reverse %}
+          <li>
+            <div class="flex items-center gap-2">
+              <span class="log-meta">
+                {{ log.created_at.strftime('%Y/%m/%d - %H:%M') | to_persian_number }}
+                &nbsp;[{{ log.type.value }}]
+              </span>
+              <span class="log-note">
+                <strong>{{ log.note | to_persian_number | highlight_tags }}</strong>
+              </span>
+            </div>
+            <button class="btn btn-ghost" title="ویرایش لاگ" onclick="editLog({{ log.id }})">✏️</button>
+          </li>
+        {% else %}
+          <li class="muted">هنوز لاگی ثبت نشده است.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  <!-- === مودال: افزودن مأموریت === -->
+  <div id="razmkar-popup" class="modal-overlay">
+    <div class="modal">
+      <h3>افزودن مأموریت جدید</h3>
+      <form id="razmkar-form">
+        <input type="hidden" name="project_id" value="{{ project.id }}">
+        <div class="row">
+          <label class="block mb-1">شرح مأموریت:</label>
+          <input name="mission" class="input" placeholder="..." required>
+        </div>
+        <div class="row">
+          <label class="block mb-1">توضیحات:</label>
+          <textarea name="note" class="textarea" rows="4" placeholder="..."></textarea>
+        </div>
+        <div class="row">
+          <label class="block mb-1">تاریخ انجام:</label>
+          <input name="due_date" class="input" type="date">
+        </div>
+        <div class="row">
+          <label class="block mb-1">وضعیت:</label>
+          <select name="status" class="select" required>
+            <option value="">انتخاب کنید...</option>
+            <option value="pending">پیش‌نویس</option>
+            <option value="in_progress">در حال انجام</option>
+            <option value="done">انجام شده</option>
+            <option value="cancelled">لغو</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">ذخیره</button>
+          <button type="button" class="btn" onclick="closeRazmkarPopup()">لغو</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- === مودال: افزودن لاگ === -->
+  <div id="log-popup" class="modal-overlay">
+    <div class="modal">
+      <h3>افزودن لاگ پروژه</h3>
+      <form id="log-form">
+        <input type="hidden" name="project_id" value="{{ project.id }}">
+        <div class="row">
+          <label class="block mb-1">یادداشت:</label>
+          <textarea name="note" class="textarea" rows="5" placeholder="..." required></textarea>
+        </div>
+        <div class="row">
+          <label class="block mb-1">ثبت‌کننده:</label>
+          <input name="created_by" class="input" placeholder="نام یا عنوان" value="راهیل">
+        </div>
+        <div class="row">
+          <label class="block mb-1">نوع لاگ:</label>
+          <select name="type" class="select" required>
+            <option value="">انتخاب کنید...</option>
+            <option value="note">یادداشت</option>
+            <option value="action">فعالیت</option>
+            <option value="followup">پیگیری</option>
+            <option value="reminder">یادآوری</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">ذخیره</button>
+          <button type="button" class="btn" onclick="closeLogPopup()">لغو</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- === مودال: ویرایش لاگ === -->
+  <div id="edit-log-popup" class="modal-overlay">
+    <div class="modal">
+      <h3>ویرایش لاگ</h3>
+      <form id="edit-log-form">
+        <input type="hidden" name="log_id" id="edit-log-id">
+        <div class="row">
+          <label class="block mb-1">توضیح لاگ:</label>
+          <textarea name="note" id="edit-log-note" class="textarea" rows="4" required></textarea>
+        </div>
+        <div class="row">
+          <label class="block mb-1">ثبت‌کننده:</label>
+          <input name="created_by" id="edit-log-created-by" class="input" placeholder="...">
+        </div>
+        <div class="row">
+          <label class="block mb-1">نوع لاگ:</label>
+          <select name="type" id="edit-log-type" class="select" required>
+            <option value="">انتخاب کنید...</option>
+            <option value="note">یادداشت</option>
+            <option value="action">فعالیت</option>
+            <option value="followup">پیگیری</option>
+            <option value="reminder">یادآوری</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">💾 ذخیره</button>
+          <button type="button" class="btn btn-danger" onclick="deleteLog()">🗑️ حذف</button>
+          <button type="button" class="btn" onclick="closeEditLogPopup()">لغو</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- === مودال: ویرایش پروژه === -->
+  <div id="edit-project-popup" class="modal-overlay">
+    <div class="modal">
+      <h3>ویرایش پروژه</h3>
+      <form id="edit-project-form">
+        <input type="hidden" name="project_id" value="{{ project.id }}">
+        <div class="row">
+          <label class="block mb-1">نام کارفرما:</label>
+          <input name="client_name" class="input" value="{{ project.client_name }}">
+        </div>
+        <div class="row">
+          <label class="block mb-1">هدف پروژه:</label>
+          <input name="goal" class="input" value="{{ project.goal }}">
+        </div>
+        <div class="row">
+          <label class="block mb-1">وضعیت:</label>
+          <select name="status" class="select" required>
+            <option value="draft"     {{ 'selected' if project.status.name == 'draft' else '' }}>پیش نویس</option>
+            <option value="active"    {{ 'selected' if project.status.name == 'active' else '' }}>فعال</option>
+            <option value="waiting"   {{ 'selected' if project.status.name == 'waiting' else '' }}>در انتظار</option>
+            <option value="completed" {{ 'selected' if project.status.name == 'completed' else '' }}>اتمام</option>
+            <option value="cancelled" {{ 'selected' if project.status.name == 'cancelled' else '' }}>لغو</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">ذخیره</button>
+          <button type="button" class="btn" onclick="closeEditPopup()">لغو</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // helper از base.html
+  const CSRF = (window.getCsrfToken && window.getCsrfToken()) || '';
+
+  // ابزارهای مودال
+  function openRazmkarPopup(){ document.getElementById('razmkar-popup').style.display='flex'; }
+  function closeRazmkarPopup(){ document.getElementById('razmkar-popup').style.display='none'; }
+  function openLogPopup(){ document.getElementById('log-popup').style.display='flex'; }
+  function closeLogPopup(){ document.getElementById('log-popup').style.display='none'; }
+  function openEditPopup(){ document.getElementById('edit-project-popup').style.display='flex'; }
+  function closeEditPopup(){ document.getElementById('edit-project-popup').style.display='none'; }
+  function closeEditLogPopup(){ document.getElementById('edit-log-popup').style.display='none'; }
+
+  // افزودن مأموریت
   (function(){
     const f = document.getElementById('razmkar-form');
     if(!f) return;
@@ -246,20 +256,24 @@
       e.preventDefault();
       const formData = new FormData(f);
       try{
-        const res = await fetch("/razmkar/create", { method:"POST", body:formData, headers:{'X-Requested-With':'XMLHttpRequest'} });
+        const res = await fetch("/razmkar/create", {
+          method:"POST",
+          body:formData,
+          headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':CSRF}
+        });
         if(!res.ok){
           let msg="خطای ناشناخته";
           try{ const data=await res.json(); msg=data.message||JSON.stringify(data); } catch{ msg=await res.text(); }
-          alert("❌ خطا: " + msg); return;
+          alert("❌ " + msg); return;
         }
         const data = await res.json();
-        alert(data.message || '✅ ماموریت با موفقیت افزوده شد');
+        alert(data.message || '✅ مأموریت افزوده شد');
         location.reload();
-      }catch(err){ alert('❌ خطای شبکه یا سرور'); console.error(err); }
+      }catch(err){ alert('❌ خطای شبکه/سرور'); console.error(err); }
     });
   })();
 
-  // ---- فرم افزودن لاگ
+  // افزودن لاگ
   (function(){
     const f = document.getElementById('log-form');
     if(!f) return;
@@ -267,7 +281,11 @@
       e.preventDefault();
       const formData = new FormData(f);
       try{
-        const res = await fetch(`/projects/{{ project.id }}/add-log`, { method:"POST", body:formData, headers:{'X-Requested-With':'XMLHttpRequest'} });
+        const res = await fetch(`/projects/{{ project.id }}/add-log`, {
+          method:"POST",
+          body:formData,
+          headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':CSRF}
+        });
         if(!res.ok){
           let msg="خطا"; try{ const d=await res.json(); msg=d.message||JSON.stringify(d); } catch{ msg=await res.text(); }
           alert("❌ " + msg); return;
@@ -279,7 +297,7 @@
     });
   })();
 
-  // ---- فرم ویرایش پروژه
+  // ویرایش پروژه
   (function(){
     const f = document.getElementById('edit-project-form');
     if(!f) return;
@@ -287,7 +305,11 @@
       e.preventDefault();
       const formData = new FormData(f);
       try{
-        const res = await fetch(`/projects/{{ project.id }}/edit`, { method:"POST", body:formData, headers:{'X-Requested-With':'XMLHttpRequest'} });
+        const res = await fetch(`/projects/{{ project.id }}/edit`, {
+          method:"POST",
+          body:formData,
+          headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':CSRF}
+        });
         if(!res.ok){
           let msg="خطا"; try{ const d=await res.json(); msg=d.message||JSON.stringify(d); } catch{ msg=await res.text(); }
           alert("❌ " + msg); return;
@@ -295,26 +317,17 @@
         const data = await res.json();
         alert(data.message || "✅ تغییرات ذخیره شد");
         location.reload();
-      }catch(err){ alert("❌ خطای شبکه یا سرور"); console.error(err); }
+      }catch(err){ alert("❌ خطای شبکه/سرور"); console.error(err); }
     });
   })();
 
-  // ---- حذف پروژه
-  async function deleteProject(){
+  // حذف پروژه (با فرم POST و ریدایرکت سرور)
+  function deleteProject(){
     if(!confirm("آیا از حذف این پروژه مطمئن هستید؟")) return;
-    try{
-      const res = await fetch(`/projects/{{ project.id }}/delete`, { method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'} });
-      if(!res.ok){
-        let msg="خطا"; try{ const d=await res.json(); msg=d.message||JSON.stringify(d); } catch{ msg=await res.text(); }
-        alert("❌ " + msg); return;
-      }
-      const data = await res.json();
-      alert(data.message || "✅ پروژه حذف شد");
-      window.location.href = "/projects";
-    }catch(err){ alert("❌ خطای شبکه یا سرور"); }
+    document.getElementById('delete-project-form').submit();
   }
 
-  // ---- ویرایش لاگ (لود داده‌ها در پاپ‌آپ)
+  // لود داده لاگ برای ویرایش
   async function editLog(logId){
     try{
       const res = await fetch(`/projects/log/${logId}`);
@@ -331,7 +344,7 @@
     }catch(err){ alert("❌ خطا در دریافت اطلاعات لاگ"); console.error(err); }
   }
 
-  // ---- ثبت و حذف لاگ
+  // ثبت و حذف لاگ
   (function(){
     const f = document.getElementById('edit-log-form');
     if(!f) return;
@@ -339,7 +352,11 @@
       e.preventDefault();
       const formData = new FormData(f);
       try{
-        const res = await fetch(`/projects/log/${formData.get('log_id')}/edit`, { method:"POST", body:formData, headers:{'X-Requested-With':'XMLHttpRequest'} });
+        const res = await fetch(`/projects/log/${formData.get('log_id')}/edit`, {
+          method:"POST",
+          body:formData,
+          headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':CSRF}
+        });
         if(!res.ok){
           let msg="خطا"; try{ const d=await res.json(); msg=d.message||JSON.stringify(d); } catch{ msg=await res.text(); }
           alert("❌ " + msg); return;
@@ -355,7 +372,10 @@
     const logId = document.getElementById('edit-log-id').value;
     if(!confirm("آیا از حذف این لاگ مطمئن هستید؟")) return;
     try{
-      const res = await fetch(`/projects/log/${logId}/delete`, { method:"POST", headers:{'X-Requested-With':'XMLHttpRequest'} });
+      const res = await fetch(`/projects/log/${logId}/delete`, {
+        method:"POST",
+        headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':CSRF}
+      });
       if(!res.ok){
         let msg="خطا"; try{ const d=await res.json(); msg=d.message||JSON.stringify(d); } catch{ msg=await res.text(); }
         alert("❌ " + msg); return;
@@ -363,7 +383,7 @@
       const data = await res.json();
       alert(data.message || "✅ لاگ حذف شد");
       location.reload();
-    }catch(err){ alert("❌ خطای سرور یا شبکه"); }
+    }catch(err){ alert("❌ خطای سرور/شبکه"); }
   }
 </script>
 {% endblock %}
