@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}برنامه هفتگی (AM/MID/PM){% endblock %}
+{% block header %}برنامه هفتگی{% endblock %}
+
+{% block content %}
+<style>
+  .planning-wrap { display:grid; grid-template-columns: 1fr 2fr; gap:1rem; }
+  .pool, .grid { background:#fff; border:1px solid #eee; border-radius:10px; padding:.75rem; }
+  .pool h3, .grid h3 { margin:.2rem 0 .6rem; }
+  .controls { display:flex; gap:.5rem; align-items:center; margin-bottom:.5rem; flex-wrap:wrap; }
+  .textbox, .select, .btn { border:1px solid #ddd; border-radius:8px; padding:.35rem .6rem; background:#fff; }
+  .btn { cursor:pointer; }
+  .small { font-size:.8rem; color:#666; }
+  .chip { border:1px solid #eee; border-radius:999px; padding:.05rem .45rem; font-size:.8rem; }
+
+  .grid table { width:100%; border-collapse:collapse; }
+  .grid th, .grid td { border:1px solid #f3f3f3; padding:.5rem; vertical-align:top; }
+  .cell { min-height:84px; display:flex; flex-direction:column; gap:.35rem; }
+  .item { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
+
+  /* دسته‌بندی‌ها */
+  .mcat { display:inline-block; padding:.05rem .4rem; border-radius:999px; font-size:.75rem; border:1px solid transparent; }
+  .mcat-field { background:#eaf7ff; color:#036; border-color:#cfe8ff; }
+  .mcat-adm   { background:#eafff4; color:#064; border-color:#c8f3e0; }
+  .mcat-desk  { background:#fff6db; color:#7a5; border-color:#ffe9a3; }
+  .mcat-unk   { background:#f5f5f5; color:#666; border-color:#eee; }
+
+  /* جدول مدال */
+  .pool-table { width:100%; border-collapse:collapse; }
+  .pool-table th, .pool-table td { border-bottom:1px solid #f3f3f3; padding:.4rem .5rem; text-align:right; }
+  .pool-table th { background:#fafafa; }
+  .nowrap { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; }
+
+  .cap { font-size:.8rem; color:#555; }
+.cap.over { color:#b00020; font-weight:600; }
+.cell.over { background:#fff3f3; }
+
+</style>
+
+{% set CAT_PERSIAN = {'administrative':'اداری', 'field':'میدانی', 'desk':'دفتری'} %}
+
+<div class="controls">
+  <form method="get" action="{{ url_for('projects.planning_week_page') }}">
+    <input type="date" name="date" class="textbox" value="{{ base_date }}">
+    <select name="category" class="select">
+      <option value="all" {% if category=='all' %}selected{% endif %}>همه دسته‌ها</option>
+      <option value="administrative" {% if category=='administrative' %}selected{% endif %}>اداری</option>
+      <option value="field" {% if category=='field' %}selected{% endif %}>میدانی</option>
+      <option value="desk" {% if category=='desk' %}selected{% endif %}>دفتری</option>
+    </select>
+    <button class="btn" type="submit">نمایش</button>
+  </form>
+  <div class="small">هفته: {{ week_from }} تا {{ week_to }} · بلوک‌ها:
+    {% for b in blocks %}
+      <span class="chip">{{ b }} ({{ block_labels[b]['label'] }})</span>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="planning-wrap">
+  <!-- استخر مأموریت‌ها (توضیح) -->
+  <section class="pool">
+    <h3>
+      مأموریت‌ها (پروژه‌های فعال
+      {% if category != 'all' %} · {{ CAT_PERSIAN.get(category, '—') }}{% endif %}
+      )
+    </h3>
+    <div class="small">برای افزودن مأموریت به بلوک، روی «+ افزودن» در سلول‌های جدول هفته کلیک کنید.</div>
+  </section>
+
+  <!-- جدول هفته -->
+  <section class="grid">
+    <h3>برنامه هفته</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>بلوک/روز</th>
+          {% for d in days %}
+            <th>{{ d }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in blocks %}
+          <tr>
+            <td>
+              <strong>{{ b }}</strong>
+              <div class="small">{{ block_labels[b]['label'] }}</div>
+            </td>
+            {% for d in days %}
+              {% set key = d ~ '_' ~ b %}
+{% set u = usage.get(key, {'used':0,'capacity': block_capacity_points.get(b, 1), 'over': False}) %}
+<td>
+  <div class="cell {% if u.over %}over{% endif %}" id="cell_{{ key|replace('-','') }}">
+    <div class="cap {% if u.over %}over{% endif %}">ظرفیت: {{ u.used }} / {{ u.capacity }}</div>
+    {% set arr = schedule.get(key, []) %}
+                  {% if not arr %}
+                    <div class="small">—</div>
+                  {% else %}
+                    {% for mid in arr %}
+                      <div class="item">
+                        <span class="chip">#{{ mid }}</span>
+                        <button class="btn" onclick="unassign('{{ d }}','{{ b }}', {{ mid }})">×</button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                  <div class="row-actions" style="margin-top:.25rem;">
+                    <button class="btn" onclick="openAdd('{{ d }}','{{ b }}')">+ افزودن</button>
+                  </div>
+                </div>
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<!-- مدال افزودن -->
+<div id="addModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.2); align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:10px; padding:1rem; width:820px; max-width:95vw; max-height:92vh; overflow:auto;">
+    <h3 style="margin-top:0;">افزودن مأموریت به <span id="addTarget"></span></h3>
+    <div style="display:flex; gap:.5rem; align-items:center; margin:.6rem 0; flex-wrap:wrap;">
+      <input type="text" id="queryBox" class="textbox" placeholder="جستجو (ID/عنوان/نام مشتری/هدف پروژه)" onkeydown="if(event.key==='Enter'){reloadPool();}">
+      <select id="categorySel" class="select">
+        <option value="all" {% if category=='all' %}selected{% endif %}>همه</option>
+        <option value="administrative" {% if category=='administrative' %}selected{% endif %}>اداری</option>
+        <option value="field" {% if category=='field' %}selected{% endif %}>میدانی</option>
+        <option value="desk" {% if category=='desk' %}selected{% endif %}>دفتری</option>
+      </select>
+      <label class="small" style="display:flex; align-items:center; gap:.35rem;">
+        <input type="checkbox" id="excludeDone" checked> فقط ناتمام
+      </label>
+      <button class="btn" onclick="reloadPool()">جستجو</button>
+    </div>
+    <div id="poolTable" style="border:1px solid #eee; border-radius:8px; padding:.5rem;">
+      <div class="small">در حال بارگذاری…</div>
+    </div>
+    <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.8rem;">
+      <button class="btn" onclick="closeAdd()">بستن</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const CAT_LABELS = { field:'میدانی', administrative:'اداری', desk:'دفتری', unknown:'نامشخص' };
+  const CAT_CLASS  = { field:'mcat-field', administrative:'mcat-adm', desk:'mcat-desk', unknown:'mcat-unk' };
+
+  let TARGET_DATE = null;
+  let TARGET_BLOCK = null;
+
+  function openAdd(d, b){
+    TARGET_DATE = d;
+    TARGET_BLOCK = b;
+    document.getElementById('addTarget').textContent = `${d} · ${b}`;
+    document.getElementById('addModal').style.display = 'flex';
+    reloadPool();
+  }
+  function closeAdd(){
+    document.getElementById('addModal').style.display = 'none';
+  }
+
+  function reloadPool(){
+    const base = new URLSearchParams(window.location.search).get('date') || '{{ base_date }}';
+    const q = document.getElementById('queryBox').value.trim();
+    const cat = document.getElementById('categorySel').value || 'all';
+    const excl = document.getElementById('excludeDone').checked ? '1' : '0';
+
+    const url = new URL('/projects/planning/pool', window.location.origin);
+    if (cat) url.searchParams.set('category', cat);
+    if (q) url.searchParams.set('q', q);
+    url.searchParams.set('exclude_done', excl);
+    url.searchParams.set('limit', '200');
+
+    fetch(url.toString())
+      .then(r=>r.json())
+      .then(data=>{
+        if(!data.ok) throw new Error(data.error || 'failed');
+        renderPool(data.items || []);
+      })
+      .catch(err=>{
+        console.error(err);
+        document.getElementById('poolTable').innerHTML = '<div class="small">خطا در بارگذاری</div>';
+      });
+  }
+
+  function renderPool(items){
+    const box = document.getElementById('poolTable');
+    if(!items.length){
+      box.innerHTML = '<div class="small">موردی یافت نشد.</div>';
+      return;
+    }
+
+    const rows = items.map(it=>{
+      const due = it.due_date ? it.due_date.slice(0,10) : '—';
+      const cat = it.category || 'unknown';
+      const catLbl = CAT_LABELS[cat] || 'نامشخص';
+      const catClass = CAT_CLASS[cat] || 'mcat-unk';
+      const proj = `${escapeHtml(it.project_client || '—')} — ${escapeHtml(it.project_goal || '—')}`;
+
+      return `
+        <tr>
+          <td class="nowrap">#${it.id}</td>
+          <td>
+            <div class="nowrap" title="${proj}">${proj}</div>
+            <div class="small">${escapeHtml(it.title || '')}</div>
+          </td>
+          <td><span class="mcat ${catClass}">${catLbl}</span></td>
+          <td class="nowrap">${due}</td>
+          <td class="nowrap">${escapeHtml(it.status_label || it.status || '')}</td>
+          <td><button class="btn" onclick="assignMission(${it.id})">افزودن</button></td>
+        </tr>
+      `;
+    }).join('');
+
+    box.innerHTML = `
+      <table class="pool-table">
+        <thead>
+          <tr>
+            <th style="width:60px;">ID</th>
+            <th>پروژه / مأموریت</th>
+            <th style="width:90px;">دسته</th>
+            <th style="width:100px;">موعد</th>
+            <th style="width:100px;">وضعیت</th>
+            <th style="width:80px;">عملیات</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+function assignMission(mid){
+  if(!TARGET_DATE || !TARGET_BLOCK){ alert('بلوک انتخاب نشده'); return; }
+  fetch('/projects/planning/week/assign', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({date: TARGET_DATE, block: TARGET_BLOCK, mission_id: mid})
+  })
+  .then(async r=>{
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok){
+      if(data && data.error === 'over_capacity'){
+        const msg = `این بلوک پر است (استفاده‌شده: ${data.used} / ظرفیت: ${data.capacity}؛ امتیاز آیتم جدید: ${data.points_new}). آیا با وجود این اضافه شود؟`;
+        if(confirm(msg)){
+          return fetch('/projects/planning/week/assign', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({date: TARGET_DATE, block: TARGET_BLOCK, mission_id: mid, force: true})
+          }).then(rr=>rr.json());
+        } else {
+          throw new Error('انصراف کاربر');
+        }
+      }
+      throw new Error(data.message || data.error || 'failed');
+    }
+    return data;
+  })
+  .then(res=>{
+    if(!res || res.ok !== true) throw new Error('failed');
+    window.location.reload();
+  })
+  .catch(err=>{ if(err && err.message!=='انصراف کاربر') alert('خطا: ' + err.message); });
+}
+
+
+  function unassign(d,b,mid){
+    fetch('/projects/planning/week/unassign', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({date: d, block: b, mission_id: mid})
+    })
+    .then(r=>r.json())
+    .then(res=>{
+      if(!res.ok) throw new Error(res.error || 'failed');
+      window.location.reload();
+    })
+    .catch(err=>{ alert('خطا: ' + err.message); });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+</script>
+{% endblock %}

@@ -5,3 +5,4 @@ Flask-SQLAlchemy
 Werkzeug
 jdatetime
 python-dateutil
+pyflakes

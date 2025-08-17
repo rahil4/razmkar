@@ -9,6 +9,8 @@ import json
 
 from app.extensions import db
 from sqlalchemy import or_, asc, desc, text
+from datetime import datetime, date, timedelta
+
 
 # ---- مدل‌ها (مطابق پروژه ZIP) ----
 # توجه: AppSetting باید تعریف شده باشد (در همین ماژول یا ماژول جدا).
@@ -600,7 +602,12 @@ def get_tag_settings():
         "category_priority": get_setting(CAT_PRIORITY_KEY, fallback=_DEFAULT_CAT_PRIORITY),
         "capacity_blocks_per_day": get_setting(CAPACITY_BLOCKS_KEY, fallback=_DEFAULT_BLOCKS),
         "block_labels": get_setting(BLOCK_LABELS_KEY, fallback=_DEFAULT_BLOCK_LABELS),
+        # NEW:
+        "block_capacity_points": get_setting(BLOCK_CAPACITY_POINTS_KEY, fallback=_DEFAULT_BLOCK_CAPACITY_POINTS),
+        "mission_points_by_category": get_setting(MISSION_POINTS_BY_CATEGORY_KEY, fallback=_DEFAULT_MISSION_POINTS_BY_CATEGORY),
+        "capacity_allow_overflow": bool(get_setting(ALLOW_OVERFLOW_KEY, fallback=False)),
     })
+
 
 @projects_bp.post("/settings/tags")
 def post_tag_settings():
@@ -620,3 +627,403 @@ def post_tag_settings():
         set_setting(BLOCK_LABELS_KEY, blabels)
 
     return jsonify({"ok": True})
+
+
+# ---- Stage 2: Weekly Planning (AM/MID/PM) ----
+from datetime import date, timedelta
+
+PLANNING_PREFIX = "capacity_schedule_"  # capacity_schedule_{YYYY-WW}
+
+def _iso_week_key(d: date) -> str:
+    # سال-هفته ISO مثل 2025-34
+    y, w, _ = d.isocalendar()
+    return f"{y:04d}-{w:02d}"
+
+def _iso_monday(d: date) -> date:
+    # شروع هفته به روش ISO (دوشنبه)
+    return d - timedelta(days=d.weekday())
+
+def _week_span(d: date) -> tuple[date, date]:
+    # دوشنبه..یکشنبه (ISO)
+    mon = _iso_monday(d)
+    sun = mon + timedelta(days=6)
+    return mon, sun
+
+def _get_blocks() -> list[str]:
+    return get_setting(CAPACITY_BLOCKS_KEY, fallback=_DEFAULT_BLOCKS)
+
+def _get_block_labels() -> dict:
+    return get_setting(BLOCK_LABELS_KEY, fallback=_DEFAULT_BLOCK_LABELS)
+
+def _planning_load(d: date) -> dict:
+    key = PLANNING_PREFIX + _iso_week_key(d)
+    return get_setting(key, fallback={})
+
+def _planning_save(d: date, schedule: dict):
+    key = PLANNING_PREFIX + _iso_week_key(d)
+    set_setting(key, schedule)
+
+def _date_str(dt: date) -> str:
+    return dt.strftime("%Y-%m-%d")
+
+def _workdays() -> list[str]:
+    # پیش‌فرض هفته کاری ایران: شنبه تا پنج‌شنبه
+    return get_setting("workdays", fallback=["sat","sun","mon","tue","wed","thu"])
+
+def _dow(dt: date) -> str:
+    # mon..sun
+    return ["mon","tue","wed","thu","fri","sat","sun"][dt.weekday()]
+
+
+
+@projects_bp.get("/planning/week")
+def planning_week_page():
+    """صفحه‌ی نمای هفته (فرم ساده‌ی افزودن/حذف مأموریت‌ها به بلوک‌ها)"""
+    _ensure_planning_defaults()
+
+    # تاریخ مبنا
+    from_str = (request.args.get("date") or "").strip()
+    try:
+        base = datetime.strptime(from_str, "%Y-%m-%d").date() if from_str else date.today()
+    except Exception:
+        base = date.today()
+
+    mon, sun = _week_span(base)
+    blocks = _get_blocks()
+    blabels = _get_block_labels()
+    schedule = _planning_load(base)  # {"YYYY-MM-DD_AM": [ids], ...}
+
+    # لیست روزهای نمایشی بر اساس workdays
+    wd = set(_workdays())
+    days = []
+    cur = mon
+    for _ in range(7):
+        if _dow(cur) in wd:
+            days.append(cur)
+        cur += timedelta(days=1)
+
+    # دسته‌ی فیلتر (all/administrative/field/desk)
+    category = (request.args.get("category") or "all").strip()
+
+    # محاسبه ظرفیت/مصرف برای هر سلول
+    usage = _compute_usage(schedule)
+
+    ctx = dict(
+        week_from=_date_str(mon),
+        week_to=_date_str(sun),
+        base_date=_date_str(base),
+        blocks=blocks,
+        block_labels=blabels,
+        schedule=schedule,
+        days=[_date_str(d) for d in days],
+        category=category,
+        usage=usage,
+        block_capacity_points=_get_block_capacity_points(),
+    )
+    return render_template("planning/week.html", **ctx)
+
+
+@projects_bp.get("/planning/week/data")
+def planning_week_data():
+    """داده خام هفته (برای اگر جلوتر بخوای ajax کنی)"""
+    _ensure_planning_defaults()
+
+    from_str = (request.args.get("date") or "").strip()
+    try:
+        base = datetime.strptime(from_str, "%Y-%m-%d").date() if from_str else date.today()
+    except Exception:
+        base = date.today()
+
+    mon, sun = _week_span(base)
+    blocks = _get_blocks()
+    blabels = _get_block_labels()
+    schedule = _planning_load(base)
+
+    wd = set(_workdays())
+    out_days = []
+    cur = mon
+    for _ in range(7):
+        if _dow(cur) in wd:
+            out_days.append(_date_str(cur))
+        cur += timedelta(days=1)
+
+    usage = _compute_usage(schedule)
+
+    return jsonify({
+        "ok": True,
+        "week": {"from": _date_str(mon), "to": _date_str(sun), "iso": _iso_week_key(base)},
+        "blocks": blocks,
+        "block_labels": blabels,
+        "days": out_days,
+        "schedule": schedule,
+        "usage": usage,
+        "block_capacity_points": _get_block_capacity_points(),
+    })
+
+
+
+
+@projects_bp.post("/planning/week/assign")
+def planning_week_assign():
+    """افزودن یک مأموریت به یک بلوک روز (با کنترل ظرفیت)"""
+    data = request.get_json(silent=True) or {}
+    date_str = (data.get("date") or "").strip()
+    block = (data.get("block") or "").strip()
+    mission_id = data.get("mission_id")
+    force = bool(data.get("force"))
+
+    if not date_str or not block or not mission_id:
+        return jsonify({"ok": False, "error": "params_required"}), 400
+
+    try:
+        base = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid_date"}), 400
+
+    schedule = _planning_load(base)
+    key = f"{date_str}_{block}"
+    arr = list(schedule.get(key, []))
+
+    # محاسبه‌ی ظرفیت این سلول
+    caps = _get_block_capacity_points()
+    cap = int(caps.get(block, 1))
+
+    pts_new = 1
+    if Razmkar:
+        m = Razmkar.query.get(mission_id)
+        if m is None:
+            return jsonify({"ok": False, "error": "mission_not_found"}), 404
+        _cat, pts_new = _mission_category_and_points(m)
+
+    # امتیاز فعلی استفاده‌شده
+    used_now = 0
+    if Razmkar and arr:
+        mids = Razmkar.query.filter(Razmkar.id.in_(arr)).all()
+        for mm in mids:
+            _c, pts = _mission_category_and_points(mm)
+            used_now += int(pts)
+    else:
+        used_now = len(arr)
+
+    # چک ظرفیت
+    allow_overflow = bool(get_setting(ALLOW_OVERFLOW_KEY, fallback=False))
+    if (used_now + int(pts_new)) > cap and not (force or allow_overflow):
+        return jsonify({
+            "ok": False,
+            "error": "over_capacity",
+            "message": "ظرفیت این بلوک پر است",
+            "used": used_now,
+            "capacity": cap,
+            "points_new": int(pts_new),
+        }), 400
+
+    if mission_id not in arr:
+        arr.append(mission_id)
+        schedule[key] = arr
+        _planning_save(base, schedule)
+
+    # usage تازه را محاسبه کنیم
+    usage = _compute_usage(schedule)
+    return jsonify({"ok": True, "schedule": schedule, "usage": usage})
+
+
+
+@projects_bp.post("/planning/week/unassign")
+def planning_week_unassign():
+    """حذف یک مأموریت از یک بلوک روز"""
+    data = request.get_json(silent=True) or {}
+    date_str = (data.get("date") or "").strip()
+    block = (data.get("block") or "").strip()
+    mission_id = data.get("mission_id")
+
+    if not date_str or not block or not mission_id:
+        return jsonify({"ok": False, "error": "params required"}), 400
+
+    try:
+        base = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid date"}), 400
+
+    schedule = _planning_load(base)
+    key = f"{date_str}_{block}"
+    changed = False
+    if key in schedule:
+        arr = [x for x in schedule[key] if x != mission_id]
+        schedule[key] = arr
+        changed = True
+
+    if changed:
+        _planning_save(base, schedule)
+
+    return jsonify({"ok": True, "schedule": schedule})
+
+
+@projects_bp.get("/planning/pool")
+def planning_pool():
+    """
+    فهرست مأموریت‌های پروژه‌های Active برای انتخاب در نمای هفته.
+    پارامترها:
+      - category: administrative|field|desk|all
+      - q: جستجو در عنوان مأموریت/یادداشت/نام مشتری/هدف پروژه
+      - limit: پیش‌فرض 200
+      - exclude_done: پیش‌فرض 1 (done/cancelled را حذف می‌کند)
+    """
+    _ensure_planning_defaults()
+
+    if Razmkar is None:
+        return jsonify({"ok": False, "error": "Razmkar module not available"}), 500
+
+    category = (request.args.get("category") or "all").strip()
+    q = (request.args.get("q") or "").strip()
+    limit = int(request.args.get("limit") or 200)
+    exclude_done = (request.args.get("exclude_done") or "1").lower() in ("1","true","on","yes")
+
+    # فقط مأموریت‌های پروژه‌های Active
+    query = (
+        Razmkar.query
+        .join(Project, Razmkar.project_id == Project.id)
+        .filter(Project.status == ProjectStatus.active)
+    )
+
+    # حذف done/cancelled مگر اینکه کاربر بخواهد
+    if exclude_done and RazmkarStatus:
+        query = query.filter(
+            Razmkar.status != RazmkarStatus.done,
+            Razmkar.status != RazmkarStatus.cancelled
+        )
+
+    # جستجو
+    if q:
+        like = f"%{q}%"
+        parts = [Razmkar.mission.ilike(like)]
+        if hasattr(Razmkar, "note"):
+            parts.append(Razmkar.note.ilike(like))
+        parts.append(Project.client_name.ilike(like))
+        parts.append(Project.goal.ilike(like))
+        query = query.filter(or_(*parts))
+
+    # مرتب‌سازی: موعددارها اول، نزدیک‌ترها جلو
+    order_cols = []
+    if hasattr(Razmkar, "due_date"):
+        order_cols.append(Razmkar.due_date.is_(None).asc())
+        order_cols.append(Razmkar.due_date.asc())
+    order_cols.append(Razmkar.id.desc())
+    items = query.order_by(*order_cols).limit(limit).all()
+
+    # سریالایزر با تشخیص دسته از روی #تگ (مرحله ۱)
+    def _ser(m):
+        texts = [
+            getattr(m, "mission", "") or "",
+            getattr(m, "note", "") or "",
+            getattr(m, "description", "") or "",
+        ]
+        cat, tags = _classify_from_texts(texts)
+        # فیلتر دسته اگر خاص انتخاب شده
+        if category in ("administrative", "field", "desk") and cat != category:
+            return None
+        return {
+            "id": m.id,
+            "project_id": m.project_id,
+            "project_client": (m.project.client_name if getattr(m, "project", None) else None),
+            "project_goal": (m.project.goal if getattr(m, "project", None) else None),
+            "title": getattr(m, "mission", f"ماموریت #{m.id}"),
+            "category": cat,                                  # field|administrative|desk|unknown
+            "status": (m.status.name if getattr(m, "status", None) else None),
+            "status_label": (m.status.value if getattr(m, "status", None) else None),
+            "due_date": (m.due_date.isoformat() if getattr(m, "due_date", None) else None),
+            "tags": tags
+        }
+
+    out = []
+    for m in items:
+        row = _ser(m)
+        if row:
+            out.append(row)
+
+    return jsonify({"ok": True, "items": out})
+
+# ظرفیت و امتیازها
+BLOCK_CAPACITY_POINTS_KEY = "block_capacity_points"
+MISSION_POINTS_BY_CATEGORY_KEY = "mission_points_by_category"
+ALLOW_OVERFLOW_KEY = "capacity_allow_overflow"
+
+_DEFAULT_BLOCK_CAPACITY_POINTS = {"AM": 2, "MID": 1, "PM": 1}
+_DEFAULT_MISSION_POINTS_BY_CATEGORY = {"field": 2, "administrative": 1, "desk": 1, "unknown": 1}
+
+
+
+
+def _ensure_planning_defaults():
+    if not get_setting(TAG_MAP_KEY):
+        set_setting(TAG_MAP_KEY, _DEFAULT_TAG_MAP)
+    if not get_setting(CAT_PRIORITY_KEY):
+        set_setting(CAT_PRIORITY_KEY, _DEFAULT_CAT_PRIORITY)
+    if not get_setting(CAPACITY_BLOCKS_KEY):
+        set_setting(CAPACITY_BLOCKS_KEY, _DEFAULT_BLOCKS)
+    if not get_setting(BLOCK_LABELS_KEY):
+        set_setting(BLOCK_LABELS_KEY, _DEFAULT_BLOCK_LABELS)
+    # NEW:
+    if not get_setting(BLOCK_CAPACITY_POINTS_KEY):
+        set_setting(BLOCK_CAPACITY_POINTS_KEY, _DEFAULT_BLOCK_CAPACITY_POINTS)
+    if not get_setting(MISSION_POINTS_BY_CATEGORY_KEY):
+        set_setting(MISSION_POINTS_BY_CATEGORY_KEY, _DEFAULT_MISSION_POINTS_BY_CATEGORY)
+    if get_setting(ALLOW_OVERFLOW_KEY) is None:
+        set_setting(ALLOW_OVERFLOW_KEY, False)
+
+
+def _get_block_capacity_points() -> dict:
+    return get_setting(BLOCK_CAPACITY_POINTS_KEY, fallback=_DEFAULT_BLOCK_CAPACITY_POINTS)
+
+def _get_mission_points_by_category() -> dict:
+    return get_setting(MISSION_POINTS_BY_CATEGORY_KEY, fallback=_DEFAULT_MISSION_POINTS_BY_CATEGORY)
+
+def _mission_category_and_points(m) -> tuple[str, int]:
+    texts = [
+        getattr(m, "mission", "") or "",
+        getattr(m, "note", "") or "",
+        getattr(m, "description", "") or "",
+    ]
+    cat, _tags = _classify_from_texts(texts)
+    pts = int(_get_mission_points_by_category().get(cat, 1))
+    return cat, pts
+
+def _compute_usage(schedule: dict) -> dict:
+    """
+    schedule: {"YYYY-MM-DD_AM":[ids], ...}
+    خروجی: {key: {"used": int, "capacity": int, "over": bool}}
+    """
+    caps = _get_block_capacity_points()
+    usage = {}
+    if not Razmkar:
+        # بدون Razmkar امتیازها را 0 در نظر بگیریم
+        for key, arr in (schedule or {}).items():
+            block = key.rsplit("_", 1)[-1]
+            cap = int(caps.get(block, 1))
+            used = len(arr or [])
+            usage[key] = {"used": used, "capacity": cap, "over": used > cap}
+        return usage
+
+    # جمع کردن همه IDها برای یک کوئری
+    all_ids = set()
+    for arr in (schedule or {}).values():
+        for mid in arr or []:
+            all_ids.add(mid)
+    missions_by_id = {}
+    if all_ids:
+        for m in Razmkar.query.filter(Razmkar.id.in_(all_ids)).all():
+            missions_by_id[m.id] = m
+
+    for key, arr in (schedule or {}).items():
+        block = key.rsplit("_", 1)[-1]
+        cap = int(caps.get(block, 1))
+        used = 0
+        for mid in arr or []:
+            m = missions_by_id.get(mid)
+            if m is not None:
+                _cat, pts = _mission_category_and_points(m)
+            else:
+                pts = 1
+            used += int(pts)
+        usage[key] = {"used": used, "capacity": cap, "over": used > cap}
+
+    return usage
