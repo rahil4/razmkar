@@ -1,258 +1,90 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fa" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}عنوان صفحه{% endblock %}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() if csrf_token is defined else '' }}">
+  <meta name="theme-color" content="#ffffff">
+  <title>{% block title %}داشبورد{% endblock %}</title>
 
- 
+  <!-- Vazirmatn (وزیرمتن) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Utilities -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/util.css') }}">
+
+  {% block extra_head %}{% endblock %}
+
   <style>
-  a {
-  text-decoration: none;
-  color: #05152c; /* آبی کلاسیک لینک */
-}
-
-a:hover {
-  text-decoration: none; /* در صورت نیاز، هنگام hover */
-  color: #0854c7; 
-}
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Thin.woff2') }}") format('woff2');
-      font-weight: 100;
+    /* فونت پایه */
+    body{
+      font:15px/1.6 "Vazirmatn","Vazir",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Arabic","IRANSans",Arial;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
     }
-
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url("{{ url_for('static', filename='fonts/Vazirmatn-ExtraLight.woff2') }}") format('woff2');
-      font-weight: 200;
-    }
-
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Light.woff2') }}") format('woff2');
-      font-weight: 300;
-    }
-
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Regular.woff2') }}") format('woff2');
-      font-weight: 400;
-    }
-
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Medium.woff2') }}") format('woff2');
-      font-weight: 500;
-    }
-
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url("{{ url_for('static', filename='fonts/Vazirmatn-SemiBold.woff2') }}") format('woff2');
-      font-weight: 600;
-    }
-
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Bold.woff2') }}") format('woff2');
-      font-weight: 700;
-    }
-
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url("{{ url_for('static', filename='fonts/Vazirmatn-ExtraBold.woff2') }}") format('woff2');
-      font-weight: 800;
-    }
-
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url("{{ url_for('static', filename='fonts/Vazirmatn-Black.woff2') }}") format('woff2');
-      font-weight: 900;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-     .tag {
-    background-color: #e0f7fa;
-    color: #006064;
-    padding: 0 4px;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    margin: 0 2px;
-  }
-
-    body {
-      margin: 0;
-      padding: 1rem;
-      font-family: 'Vazirmatn', sans-serif;
-      font-weight: 400;
-      background-color: #f9f9f9;
-      color: #222;
-    }
-    button,
-    input,
-    select,
-    textarea {
-      font-family: 'Vazirmatn', sans-serif;
-      font-weight: inherit;
-}
-    header {
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid #ddd;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
-    }
-
-    main {
-      max-width: 100%;
-      margin: 0 auto;
-      padding: 0 1rem;
-    }
-
-    @media (min-width: 768px) {
-      main {
-        max-width: 900px;
-      }
-    }
-
-.button-glass {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border-radius: 10px;
-  color: #0d6efd;
-  font-size: 0.95rem;
-  padding: 0.4rem 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-}
-
-.button-glass:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #084298;
-  border-color: rgba(255, 255, 255, 0.4);
-}
-        /* استایل پاپ‌آپ عمومی */
-.popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.4);
-  display: none; /* پیش‌فرض مخفی */
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-
-.popup {
-  background: white;
-  padding: 2rem;
-  border-radius: 1rem;
-  max-width: 500px;
-  width: 90%;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-}
-    
-     nav {
-    background: #57606f;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #ccc;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    direction: rtl;
-    flex-wrap: wrap;
-  }
-
-  .nav-title {
-    font-weight: 600;
-    font-size: 1.25rem;
-    color: white;
-    text-decoration: none;
-  }
-
-  .nav-toggle {
-    display: none;
-    font-size: 1.5rem;
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-  }
-
-  .nav-links {
-    display: flex;
-    gap: 1rem;
-  }
-
-  .nav-links a {
-    text-decoration: none;
-    color: white;
-    font-size: 0.95rem;
-  }
-
-  @media (max-width: 600px) {
-    .nav-toggle {
-      display: block;
-    }
-
-    .nav-links {
-      display: none;
-      flex-direction: column;
-      width: 100%;
-      margin-top: 1rem;
-    }
-
-    .nav-links.show {
-      display: flex;
-    }
-  }
-
   </style>
-  {% block styles %}{% endblock %}
 </head>
 <body>
 
-<nav>
-  <a class="nav-title" href="/">RAZMKAR</a>
-  <button class="nav-toggle" onclick="toggleMenu()">☰</button>
-  <div class="nav-links" id="navLinks">
-    <a href="/today">امروز من</a>
-    <a href="/projects">پروژه‌ها</a>
-    <a href="/razmkar/list">ماموریت‌ها</a>
-    <a href="/">داشبورد</a>
+  <!-- Navbar -->
+  <div class="navbar-wrap">
+    <div class="container navbar">
+      <div class="brand"><a href="{{ url_for('projects.manage_projects') }}">رزمکار</a></div>
+
+      {% set ep = request.endpoint or '' %}
+      {% set is_manage   = (ep == 'projects.manage_projects') %}
+      {% set is_week     = (ep in ['projects.planning_week_page','projects.planning_week_data']) %}
+      {% set is_settings = (ep == 'projects.planning_settings_page') %}
+
+      <button class="burger" type="button" onclick="document.getElementById('topnav').classList.toggle('open')">☰ منو</button>
+
+      <nav id="topnav" class="nav">
+        <a href="{{ url_for('projects.manage_projects') }}" class="{{ 'active' if is_manage else '' }}">مدیریت پروژه‌ها</a>
+        <a href="{{ url_for('projects.planning_week_page') }}" class="{{ 'active' if is_week else '' }}">برنامه هفتگی</a>
+        <a href="{{ url_for('projects.planning_settings_page') }}" class="{{ 'active' if is_settings else '' }}">تنظیمات</a>
+      </nav>
+    </div>
   </div>
-</nav>
 
+  <!-- Page header + actions -->
+  <div class="container">
+    <div class="flex items-center justify-between wrap gap-3 mt-2">
+      <h1 class="h1">{% block header %}عنوان صفحه{% endblock %}</h1>
+      <div class="flex items-center gap-2 wrap">
+        {% block actions %}{% endblock %}
+      </div>
+    </div>
 
-  <header>
-    <h5>{% block header %} {% endblock %}</h5>
-  </header>
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flex wrap gap-2 mt-2">
+          {% for category, message in messages %}
+            <div class="alert
+                        {% if category=='success' %}alert-success{% endif %}
+                        {% if category=='warning' %}alert-warning{% endif %}
+                        {% if category=='danger'  %}alert-danger{% endif %}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
 
-  <main>
-    {% block content %}{% endblock %}
-  </main>
-  {% block scripts %}{% endblock %}
+    <!-- Main content -->
+    <main class="mt-2 mb-3">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 
-
-
+  {% block extra_scripts %}{% endblock %}
   <script>
-  function toggleMenu() {
-    const links = document.getElementById('navLinks');
-    links.classList.toggle('show');
-  }
-</script>
+    // Helper: گرفتن CSRF از متا برای درخواست‌های AJAX
+    window.getCsrfToken = function(){
+      const m = document.querySelector('meta[name="csrf-token"]');
+      return m ? m.getAttribute('content') : '';
+    };
+  </script>
 </body>
 </html>

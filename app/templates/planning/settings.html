@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% block title %}تنظیمات برنامه‌ریزی{% endblock %}
+{% block header %}تنظیمات برنامه‌ریزی{% endblock %}
+
+{% block content %}
+<style>
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.8rem}
+  .card{border:1px solid #eee;border-radius:12px;padding:.8rem;background:#fff}
+  .card h3{margin:.2rem 0 .6rem}
+  .row{display:flex;align-items:center;gap:.5rem;margin:.35rem 0}
+  .tbl{width:100%;border-collapse:collapse}
+  .tbl th,.tbl td{border-bottom:1px solid #f1f1f1;padding:.4rem .3rem;text-align:right}
+  .tbl th{background:#fafafa}
+  .btn{border:1px solid #ddd;border-radius:8px;padding:.3rem .6rem;background:#fff;cursor:pointer}
+  .textbox,.select{border:1px solid #ddd;border-radius:8px;padding:.3rem .5rem;background:#fff;width:100%}
+  .hint{color:#666;font-size:.85rem}
+  .chips{display:flex;flex-wrap:wrap;gap:.4rem}
+  .chip{border:1px solid #ddd;border-radius:999px;padding:.15rem .45rem;background:#fafafa;font-size:.85rem}
+  .footer{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1rem}
+</style>
+
+<input type="hidden" id="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+
+<div class="grid">
+  <!-- تگ ← دسته -->
+  <div class="card">
+    <h3>نگاشت #تگ ← دسته</h3>
+    <div class="hint">تگ‌هایی که در لاگ/عنوان می‌نویسی، اینجا دسته‌بندی می‌شوند.</div>
+    <table class="tbl" id="tagTable">
+      <thead>
+        <tr><th style="width:45%">#تگ</th><th>دسته</th><th style="width:1%"></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="row">
+      <input id="newTag" class="textbox" placeholder="مثلاً نقشه_برداری">
+      <select id="newTagCat" class="select">
+        <option value="administrative">اداری</option>
+        <option value="field">میدانی</option>
+        <option value="desk">دفتری</option>
+      </select>
+      <button class="btn" onclick="addTagRow()">افزودن</button>
+    </div>
+  </div>
+
+  <!-- تقدم دسته‌ها -->
+  <div class="card">
+    <h3>تقدم دسته‌ها</h3>
+    <div class="hint">اگر یک مأموریت چند #تگ مختلف داشت، اولویت تعیین می‌کند کدام دسته غالب شود.</div>
+    <div id="prioList" class="chips"></div>
+    <div class="row">
+      <button class="btn" onclick="rotatePrio()">چرخش ترتیب</button>
+      <button class="btn" onclick="resetPrio()">پیش‌فرض</button>
+    </div>
+  </div>
+
+  <!-- روزهای کاری -->
+  <div class="card">
+    <h3>روزهای کاری</h3>
+    <div class="row chips" id="workdayBox"></div>
+    <div class="hint">نمای هفته فقط همین روزها را نشان می‌دهد.</div>
+  </div>
+
+  <!-- برچسب/ساعت بلوک‌ها -->
+  <div class="card">
+    <h3>بلوک‌های زمانی</h3>
+    <div class="hint">برچسب و ساعت هر بلوک.</div>
+    <table class="tbl" id="blockLabelTbl">
+      <thead><tr><th>بلوک</th><th>برچسب</th><th>شروع</th><th>پایان</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- ظرفیت و امتیازها -->
+  <div class="card">
+    <h3>ظرفیت/امتیاز</h3>
+    <div class="hint">ظرفیت هر بلوک (امتیاز) و امتیاز هر دسته.</div>
+
+    <h4 style="margin:.4rem 0 .2rem">ظرفیت بلوک‌ها</h4>
+    <table class="tbl" id="blockCapTbl">
+      <thead><tr><th>بلوک</th><th>ظرفیت (امتیاز)</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h4 style="margin:.8rem 0 .2rem">امتیاز دسته‌ها</h4>
+    <table class="tbl" id="catPtsTbl">
+      <thead><tr><th>دسته</th><th>امتیاز</th></tr></thead>
+      <tbody>
+        <tr><td>اداری (administrative)</td><td><input class="textbox" id="pt_administrative" type="number" min="1"></td></tr>
+        <tr><td>میدانی (field)</td><td><input class="textbox" id="pt_field" type="number" min="1"></td></tr>
+        <tr><td>دفتری (desk)</td><td><input class="textbox" id="pt_desk" type="number" min="1"></td></tr>
+      </tbody>
+    </table>
+
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:.4rem;">
+        <input type="checkbox" id="allowOverflow">
+        اجازهٔ سرریز ظرفیت
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <button class="btn" onclick="saveAll()">ذخیره</button>
+  <a class="btn" href="{{ url_for('projects.planning_week_page') }}" target="_blank">نمای هفته ↗</a>
+</div>
+
+<script>
+  // داده‌های اولیه از سرور
+  const TAG_MAP = {{ tag_category_map|tojson }};
+  const PRIO = {{ category_priority|tojson }};
+  const BLOCKS = {{ blocks|tojson }};
+  const BLOCK_LABELS = {{ block_labels|tojson }};
+  const BLOCK_CAP = {{ block_capacity_points|tojson }};
+  const MPTS = {{ mission_points_by_category|tojson }};
+  const ALLOW = {{ 'true' if capacity_allow_overflow else 'false' }};
+  const WORKDAYS = {{ workdays|tojson }};
+
+  const PERSIAN_DAY = {mon:'دوشنبه',tue:'سه‌شنبه',wed:'چهارشنبه',thu:'پنج‌شنبه',fri:'جمعه',sat:'شنبه',sun:'یکشنبه'};
+
+  function getCsrf(){ return document.getElementById('csrf_token')?.value || ''; }
+
+  // --- نگاشت تگ‌ها ---
+  const tagTbody = document.querySelector('#tagTable tbody');
+  function renderTagTable(){
+    tagTbody.innerHTML = '';
+    Object.entries(TAG_MAP).forEach(([tg,cat])=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="textbox" value="${tg}" data-old="${tg}"></td>
+        <td>
+          <select class="select">
+            <option value="administrative" ${cat==='administrative'?'selected':''}>اداری</option>
+            <option value="field" ${cat==='field'?'selected':''}>میدانی</option>
+            <option value="desk" ${cat==='desk'?'selected':''}>دفتری</option>
+          </select>
+        </td>
+        <td><button class="btn" onclick="delTagRow(this)">حذف</button></td>
+      `;
+      tagTbody.appendChild(tr);
+    });
+  }
+  function addTagRow(){
+    const key = document.getElementById('newTag').value.trim();
+    const cat = document.getElementById('newTagCat').value;
+    if(!key) return;
+    TAG_MAP[key] = cat;
+    document.getElementById('newTag').value = '';
+    renderTagTable();
+  }
+  function delTagRow(btn){
+    const tr = btn.closest('tr');
+    const old = tr.querySelector('input.textbox').dataset.old;
+    if(old && TAG_MAP[old]!==undefined) delete TAG_MAP[old];
+    tr.remove();
+  }
+
+  // --- تقدم دسته‌ها ---
+  function renderPrio(){
+    const box = document.getElementById('prioList');
+    box.innerHTML = '';
+    PRIO.forEach(p=>{
+      const span = document.createElement('span');
+      span.className = 'chip';
+      span.textContent = (p==='administrative'?'اداری':p==='field'?'میدانی':p==='desk'?'دفتری':p);
+      box.appendChild(span);
+    });
+  }
+  function rotatePrio(){
+    PRIO.push(PRIO.shift());
+    renderPrio();
+  }
+  function resetPrio(){
+    PRIO.splice(0, PRIO.length, 'administrative','field','desk');
+    renderPrio();
+  }
+
+  // --- روزهای کاری ---
+  function renderWorkdays(){
+    const box = document.getElementById('workdayBox');
+    box.innerHTML = '';
+    ['sat','sun','mon','tue','wed','thu','fri'].forEach(k=>{
+      const id = 'wd_'+k;
+      const lbl = PERSIAN_DAY[k] || k;
+      const wrap = document.createElement('label');
+      wrap.className = 'chip';
+      wrap.style.cursor = 'pointer';
+      wrap.innerHTML = `<input type="checkbox" id="${id}" ${WORKDAYS.includes(k)?'checked':''}> ${lbl}`;
+      box.appendChild(wrap);
+    });
+  }
+
+  // --- برچسب/ساعت بلوک‌ها ---
+  function renderBlockLabels(){
+    const body = document.querySelector('#blockLabelTbl tbody');
+    body.innerHTML = '';
+    BLOCKS.forEach(b=>{
+      const row = document.createElement('tr');
+      const bl = BLOCK_LABELS[b] || {label:'',start:'',end:''};
+      row.innerHTML = `
+        <td><code>${b}</code></td>
+        <td><input class="textbox bl-label" data-b="${b}" value="${bl.label||''}"></td>
+        <td><input class="textbox bl-start" data-b="${b}" value="${bl.start||''}" placeholder="HH:MM"></td>
+        <td><input class="textbox bl-end" data-b="${b}" value="${bl.end||''}" placeholder="HH:MM"></td>
+      `;
+      body.appendChild(row);
+    });
+  }
+
+  // --- ظرفیت بلوک‌ها ---
+  function renderBlockCaps(){
+    const body = document.querySelector('#blockCapTbl tbody');
+    body.innerHTML = '';
+    BLOCKS.forEach(b=>{
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><code>${b}</code></td>
+        <td><input class="textbox bc" data-b="${b}" type="number" min="1" value="${(BLOCK_CAP[b]??1)}"></td>
+      `;
+      body.appendChild(row);
+    });
+  }
+
+  // --- امتیاز دسته‌ها ---
+  function renderCatPts(){
+    document.getElementById('pt_administrative').value = (MPTS.administrative ?? 1);
+    document.getElementById('pt_field').value = (MPTS.field ?? 2);
+    document.getElementById('pt_desk').value = (MPTS.desk ?? 1);
+  }
+
+  function renderAllow(){
+    document.getElementById('allowOverflow').checked = (ALLOW === true || ALLOW === 'true');
+  }
+
+  // --- ذخیره ---
+  function collectTagMap(){
+    const map = {};
+    document.querySelectorAll('#tagTable tbody tr').forEach(tr=>{
+      const k = tr.querySelector('input.textbox').value.trim();
+      const v = tr.querySelector('select.select').value;
+      if(k) map[k]=v;
+    });
+    return map;
+  }
+  function collectWorkdays(){
+    const arr=[];
+    ['sat','sun','mon','tue','wed','thu','fri'].forEach(k=>{
+      const id = 'wd_'+k;
+      if(document.getElementById(id).checked) arr.push(k);
+    });
+    return arr;
+  }
+  function collectBlockLabels(){
+    const out = {};
+    BLOCKS.forEach(b=>{
+      const label = document.querySelector(`.bl-label[data-b="${b}"]`)?.value || '';
+      const start = document.querySelector(`.bl-start[data-b="${b}"]`)?.value || '';
+      const end   = document.querySelector(`.bl-end[data-b="${b}"]`)?.value || '';
+      out[b] = {label,start,end};
+    });
+    return out;
+  }
+  function collectBlockCaps(){
+    const out = {};
+    document.querySelectorAll('#blockCapTbl .bc').forEach(inp=>{
+      out[inp.dataset.b] = parseInt(inp.value || '1', 10);
+    });
+    return out;
+  }
+  function collectCatPts(){
+    return {
+      administrative: parseInt(document.getElementById('pt_administrative').value||'1',10),
+      field: parseInt(document.getElementById('pt_field').value||'2',10),
+      desk: parseInt(document.getElementById('pt_desk').value||'1',10),
+      unknown: 1
+    };
+  }
+
+  function saveAll(){
+    const payload = {
+      tag_category_map: collectTagMap(),
+      category_priority: PRIO.slice(),
+      capacity_blocks_per_day: BLOCKS.slice(),
+      block_labels: collectBlockLabels(),
+      block_capacity_points: collectBlockCaps(),
+      mission_points_by_category: collectCatPts(),
+      capacity_allow_overflow: document.getElementById('allowOverflow').checked,
+      workdays: collectWorkdays(),
+    };
+    fetch('{{ url_for("projects.post_tag_settings") }}', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()},
+      body: JSON.stringify(payload)
+    })
+    .then(r=>r.json())
+    .then(res=>{
+      if(!res.ok) throw new Error('ذخیره انجام نشد');
+      alert('✅ تنظیمات ذخیره شد');
+    })
+    .catch(err=>{ alert('خطا: '+err.message); });
+  }
+
+  // init
+  renderTagTable();
+  renderPrio();
+  renderWorkdays();
+  renderBlockLabels();
+  renderBlockCaps();
+  renderCatPts();
+  renderAllow();
+</script>
+{% endblock %}

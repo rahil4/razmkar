@@ -4,6 +4,10 @@
 
 {% block content %}
 <style>
+ 
+
+
+
   .planning-wrap { display:grid; grid-template-columns: 1fr 2fr; gap:1rem; }
   .pool, .grid { background:#fff; border:1px solid #eee; border-radius:10px; padding:.75rem; }
   .pool h3, .grid h3 { margin:.2rem 0 .6rem; }
@@ -34,7 +38,26 @@
   .cap { font-size:.8rem; color:#555; }
 .cap.over { color:#b00020; font-weight:600; }
 .cell.over { background:#fff3f3; }
+.item.card {
+  border:1px solid #eee;
+  border-radius:10px;
+  padding:.4rem .5rem;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:.5rem;
+}
+.card-main { min-width:0; }
+.card-title { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:280px; }
+.card-meta { font-size:.8rem; color:#666; }
+.card-actions { display:flex; gap:.35rem; }
 
+  .gear-link {
+    display:inline-block; margin-right:.4rem; border:1px solid #e5e5e5;
+    padding:.1rem .45rem; border-radius:8px; text-decoration:none; color:#333;
+    background:#fff; font-size:.9rem; line-height:1;
+  }
+  .gear-link:hover { background:#f7f7f7; }
 </style>
 
 {% set CAT_PERSIAN = {'administrative':'اداری', 'field':'میدانی', 'desk':'دفتری'} %}
@@ -50,11 +73,11 @@
     </select>
     <button class="btn" type="submit">نمایش</button>
   </form>
-  <div class="small">هفته: {{ week_from }} تا {{ week_to }} · بلوک‌ها:
-    {% for b in blocks %}
-      <span class="chip">{{ b }} ({{ block_labels[b]['label'] }})</span>
-    {% endfor %}
-  </div>
+<div class="small">
+  هفته: {{ week_from_j | to_persian_number }} تا {{ week_to_j | to_persian_number }}
+  · بلوک‌ها: {{ block_labels.AM.label }} / {{ block_labels.MID.label }} / {{ block_labels.PM.label }}
+  <a class="gear-link" href="{{ url_for('projects.planning_settings_page') }}" title="تنظیمات برنامه‌ریزی">⚙️</a>
+</div>
 </div>
 
 <div class="planning-wrap">
@@ -76,7 +99,12 @@
         <tr>
           <th>بلوک/روز</th>
           {% for d in days %}
-            <th>{{ d }}</th>
+           <th>
+  {{ days_map[d] | to_persian_number }}
+  <a class="btn" href="{{ url_for('projects.planning_day_page', date=d) }}" target="_blank" title="خروجی روز">🖨</a>
+</th>
+
+
           {% endfor %}
         </tr>
       </thead>
@@ -98,11 +126,40 @@
                     <div class="small">—</div>
                   {% else %}
                     {% for mid in arr %}
-                      <div class="item">
-                        <span class="chip">#{{ mid }}</span>
-                        <button class="btn" onclick="unassign('{{ d }}','{{ b }}', {{ mid }})">×</button>
-                      </div>
-                    {% endfor %}
+  {% set info = mission_lookup.get(mid) %}
+  <div class="item card" title="{{ info.title if info else ('#' ~ mid) }}">
+    <div class="card-main">
+      {# چیپ دسته #}
+      {% set cat = (info.category if info else 'unknown') %}
+      {% set cat_class = 'mcat-' ~ ('adm' if cat=='administrative' else 'desk' if cat=='desk' else 'field' if cat=='field' else 'unk') %}
+      <span class="mcat {{ cat_class }}">
+        {{ 'اداری' if cat=='administrative' else 'دفتری' if cat=='desk' else 'میدانی' if cat=='field' else 'نامشخص' }}
+      </span>
+
+      {# عنوان مأموریت #}
+      <div class="card-title" style="margin-top:.15rem;">
+        {{ info.title if info else ('ماموریت #' ~ mid) }}
+      </div>
+
+      {# پروژه و موعد/وضعیت #}
+      <div class="card-meta">
+        {{ (info.project_client or '—') if info else '—' }} — {{ (info.project_goal or '—') if info else '—' }}
+      </div>
+      <div class="card-meta">
+       موعد: {{ fmt_jalali(info.due_date) if (info and info.due_date) else '—' | to_persian_number }}
+
+        · وضعیت: {{ (info.status_label or info.status) if info else '—' }}
+      </div>
+    </div>
+    <div class="card-actions">
+      <a class="btn" href="/razmkar/{{ mid }}" target="_blank" rel="noopener" title="باز کردن">↗</a>
+      <button class="btn" onclick="unassign('{{ d }}','{{ b }}', {{ mid }})" title="حذف از بلوک">×</button>
+      <button class="btn" onclick="openMove('{{ d }}','{{ b }}', {{ mid }})" title="انتقال">↔︎</button>
+
+    </div>
+  </div>
+{% endfor %}
+
                   {% endif %}
                   <div class="row-actions" style="margin-top:.25rem;">
                     <button class="btn" onclick="openAdd('{{ d }}','{{ b }}')">+ افزودن</button>
@@ -139,6 +196,26 @@
     </div>
     <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.8rem;">
       <button class="btn" onclick="closeAdd()">بستن</button>
+    </div>
+  </div>
+</div>
+
+<!-- مدال انتقال -->
+<div id="moveModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.2); align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:10px; padding:1rem; width:520px; max-width:90vw;">
+    <h3 style="margin-top:0;">انتقال مأموریت <span id="moveMid"></span></h3>
+    <div class="small" style="margin:.25rem 0;">از: <span id="moveSrc"></span></div>
+    <div style="display:flex; gap:.5rem; align-items:center; margin:.6rem 0; flex-wrap:wrap;">
+      <label>روز مقصد:
+        <select id="moveDateSel" class="select"></select>
+      </label>
+      <label>بلوک مقصد:
+        <select id="moveBlockSel" class="select"></select>
+      </label>
+      <button class="btn" onclick="doMove()">انتقال</button>
+    </div>
+    <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.8rem;">
+      <button class="btn" onclick="closeMove()">بستن</button>
     </div>
   </div>
 </div>
@@ -281,5 +358,115 @@ function assignMission(mid){
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   }
+</script>
+<script>
+  // داده‌های هفته برای پر کردن سلکت‌ها
+  const WEEK_DAYS = {{ days|tojson }};
+  const WEEK_BLOCKS = {{ blocks|tojson }};
+
+  let MOVE_SRC_DATE = null;
+  let MOVE_SRC_BLOCK = null;
+  let MOVE_MID = null;
+
+  function openMove(srcDate, srcBlock, mid){
+    MOVE_SRC_DATE = srcDate;
+    MOVE_SRC_BLOCK = srcBlock;
+    MOVE_MID = mid;
+
+    document.getElementById('moveMid').textContent = '#' + mid;
+    document.getElementById('moveSrc').textContent = `${srcDate} · ${srcBlock}`;
+
+    // پر کردن سلکت‌ها
+    const ds = document.getElementById('moveDateSel');
+    const bs = document.getElementById('moveBlockSel');
+    ds.innerHTML = WEEK_DAYS.map(d => `<option value="${d}" ${d===srcDate?'selected':''}>${d}</option>`).join('');
+    bs.innerHTML = WEEK_BLOCKS.map(b => `<option value="${b}" ${b===srcBlock?'selected':''}>${b}</option>`).join('');
+
+    document.getElementById('moveModal').style.display = 'flex';
+  }
+
+  function closeMove(){
+    document.getElementById('moveModal').style.display = 'none';
+  }
+
+  function doMove(){
+    const dstDate = document.getElementById('moveDateSel').value;
+    const dstBlock = document.getElementById('moveBlockSel').value;
+
+    fetch('/projects/planning/week/move', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        src_date: MOVE_SRC_DATE,
+        src_block: MOVE_SRC_BLOCK,
+        dst_date: dstDate,
+        dst_block: dstBlock,
+        mission_id: MOVE_MID
+      })
+    })
+    .then(async r=>{
+      const data = await r.json().catch(()=>({}));
+      if(!r.ok){
+        if(data && data.error === 'over_capacity'){
+          const msg = `بلوک مقصد پر است (استفاده‌شده: ${data.used} / ظرفیت: ${data.capacity}؛ امتیاز آیتم: ${data.points_new}). انتقال با «force» انجام شود؟`;
+          if(confirm(msg)){
+            return fetch('/projects/planning/week/move', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({
+                src_date: MOVE_SRC_DATE,
+                src_block: MOVE_SRC_BLOCK,
+                dst_date: dstDate,
+                dst_block: dstBlock,
+                mission_id: MOVE_MID,
+                force: true
+              })
+            }).then(rr=>rr.json());
+          } else {
+            throw new Error('انصراف کاربر');
+          }
+        }
+        throw new Error(data.message || data.error || 'failed');
+      }
+      return data;
+    })
+    .then(res=>{
+      if(!res || res.ok !== true) throw new Error('failed');
+      window.location.reload();
+    })
+    .catch(err=>{
+      if(err && err.message!=='انصراف کاربر'){
+        alert('خطا: ' + err.message);
+      }
+    });
+  }
+</script>
+<script>
+  const DAYS_MAP = {{ days_map | tojson }};   // {"2025-08-18":"1404-05-27", ...}
+
+  function openAdd(d, b){
+  TARGET_DATE = d;
+  TARGET_BLOCK = b;
+  document.getElementById('addTarget').textContent = `${DAYS_MAP[d] || d} · ${b}`;
+  document.getElementById('addModal').style.display = 'flex';
+  reloadPool();
+}
+
+function openMove(srcDate, srcBlock, mid){
+  MOVE_SRC_DATE = srcDate;
+  MOVE_SRC_BLOCK = srcBlock;
+  MOVE_MID = mid;
+
+  document.getElementById('moveMid').textContent = '#' + mid;
+  document.getElementById('moveSrc').textContent = `${DAYS_MAP[srcDate] || srcDate} · ${srcBlock}`;
+
+  const ds = document.getElementById('moveDateSel');
+  const bs = document.getElementById('moveBlockSel');
+  ds.innerHTML = WEEK_DAYS.map(d => `<option value="${d}" ${d===srcDate?'selected':''}>${DAYS_MAP[d] || d}</option>`).join('');
+  bs.innerHTML = WEEK_BLOCKS.map(b => `<option value="${b}" ${b===srcBlock?'selected':''}>${b}</option>`).join('');
+
+  document.getElementById('moveModal').style.display = 'flex';
+}
+
 </script>
 {% endblock %}

@@ -1,0 +1,127 @@
+/* ====== Core variables ====== */
+:root{
+  --bg:#ffffff; --fg:#222; --muted:#666; --line:#eee;
+  --brand:#0a6; --brand-weak:#e8fff5;
+  --ok:#0aa678; --warn:#f0ad00; --danger:#d32f2f;
+  --ring:#e6f7f1;
+  --font-sans: "Vazirmatn","Vazir",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Arabic","IRANSans",Arial;
+}
+
+/* ====== Base resets ====== */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--fg);margin:0;
+  font-family:var(--font-sans);
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+}
+img{max-width:100%;height:auto}
+a{color:#0a6;text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* ====== Layout helpers ====== */
+.container{max-width:1100px;margin:0 auto;padding:0 12px}
+.flex{display:flex}.inline-flex{display:inline-flex}
+.grid{display:grid}
+.wrap{flex-wrap:wrap}
+.items-center{align-items:center}
+.items-start{align-items:flex-start}
+.items-end{align-items:flex-end}
+.justify-between{justify-content:space-between}
+.justify-center{justify-content:center}
+.gap-1{gap:.25rem}.gap-2{gap:.5rem}.gap-3{gap:.75rem}.gap-4{gap:1rem}
+.p-1{padding:.25rem}.p-2{padding:.5rem}.p-3{padding:.75rem}.p-4{padding:1rem}
+.py-1{padding-top:.25rem;padding-bottom:.25rem}
+.py-2{padding-top:.5rem;padding-bottom:.5rem}
+.px-2{padding-left:.5rem;padding-right:.5rem}
+.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}
+.mb-1{margin-bottom:.25rem}.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:.75rem}
+.ms-1{margin-right:.25rem}.me-1{margin-left:.25rem} /* RTL-friendly */
+.hidden{display:none !important}
+.w-100{width:100%}
+
+/* Responsive grid cards */
+.cols-auto{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width: 780px){ .cols-3{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width: 560px){ .cols-2,.cols-3{grid-template-columns:1fr} }
+
+/* ====== Typography ====== */
+.small{font-size:.9rem}.muted{color:var(--muted)}
+.h1{font-size:1.35rem;font-weight:700;margin:.2rem 0}
+.h2{font-size:1.15rem;font-weight:600;margin:.2rem 0}
+.lead{font-size:1.05rem;color:var(--muted)}
+
+/* ====== Components ====== */
+/* Buttons */
+.btn{
+  border:1px solid #ddd;border-radius:10px;background:#fff;
+  color:#333;padding:.35rem .6rem;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;
+  text-decoration:none;line-height:1.2
+}
+.btn:hover{background:#fafafa}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn-primary{border-color:#0bc29f;background:var(--brand-weak)}
+.btn-ok{border-color:#8be6c9;background:#f0fffa}
+.btn-warn{border-color:#ffe08a;background:#fff9e6}
+.btn-danger{border-color:#ffb3b3;background:#ffecec}
+.btn-ghost{border-color:transparent;background:transparent}
+.btn-sm{padding:.25rem .45rem;border-radius:8px;font-size:.9rem}
+/* همه‌ی کنترل‌های فرم و دکمه‌ها فونت را از body بگیرند */
+button, input, select, textarea { font-family: inherit; font-size: 1em; }
+
+/* اطمینان برای کلاس‌های رایج پروژه */
+.btn, .chip, .badge, .input, .select, .textarea,
+.table, .table th, .table td, .card, .nav a { font-family: inherit; }
+
+/* Inputs / Selects / Textareas */
+.input,.select,.textarea{
+  border:1px solid #ddd;border-radius:8px;background:#fff;
+  padding:.35rem .5rem;color:#333
+}
+.input:focus,.select:focus,.textarea:focus{outline:0;box-shadow:0 0 0 3px var(--ring)}
+.textarea{min-height:96px;resize:vertical}
+
+/* Cards */
+.card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:.75rem}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+.chip{border:1px solid var(--line);border-radius:999px;background:#fafafa;padding:.15rem .5rem;font-size:.9rem}
+
+/* Badges */
+.badge{border:1px solid transparent;border-radius:999px;padding:.15rem .45rem;font-size:.8rem}
+.badge-ok{color:var(--ok);background:#e8fff5}
+.badge-warn{color:#a60;background:#fff6e6}
+.badge-danger{color:#b00;background:#ffecec}
+
+/* Tables */
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:.55rem;border-bottom:1px solid var(--line);text-align:right}
+.table th{background:#fafafa;font-weight:600}
+.table.row-hover tbody tr{cursor:pointer;transition:background-color .15s ease}
+.table.row-hover tbody tr:hover{background:#f6f9ff}
+
+/* Navbar (optional: اگر در base.html داری، همین کلاس‌ها هم‌سو هستند) */
+.navbar-wrap{border-bottom:1px solid #eee;background:#fff;position:sticky;top:0;z-index:100}
+.navbar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.6rem 0}
+.brand{font-weight:800}
+.nav{display:flex;gap:.4rem;align-items:center}
+.nav a{color:#222;text-decoration:none;border:1px solid transparent;padding:.35rem .6rem;border-radius:10px}
+.nav a:hover{background:#fafafa}
+.nav a.active{background:var(--brand-weak);border-color:#d9f6eb}
+.burger{display:none;border:1px solid #eee;background:#fff;border-radius:8px;padding:.25rem .5rem;cursor:pointer}
+@media (max-width: 720px){
+  .nav{display:none;flex-direction:column;align-items:stretch;border-top:1px solid #eee;padding-top:.5rem;margin-top:.5rem}
+  .nav.open{display:flex}
+  .burger{display:inline-block}
+}
+
+/* Flash / Alerts */
+.alert{border:1px solid #eee;border-right-width:5px;border-radius:10px;background:#fff;padding:.45rem .6rem}
+.alert-success{border-right-color:var(--ok)}
+.alert-warning{border-right-color:var(--warn)}
+.alert-danger{border-right-color:var(--danger)}
+
+/* Print helpers */
+@media print{ .noprint{display:none !important} body{background:#fff} }

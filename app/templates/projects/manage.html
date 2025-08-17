@@ -2,147 +2,190 @@
 {% block title %}مدیریت پروژه‌ها{% endblock %}
 {% block header %}پروژه‌ها – کنترل سریع{% endblock %}
 
-{% block content %}
+{% block extra_head %}
 <style>
-  .controls { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; justify-content:space-between; margin-bottom:.75rem; }
-  .controls .left, .controls .right { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
-  .textbox, .select, .btn { border:1px solid #ddd; border-radius:8px; padding:.4rem .6rem; background:#fff; }
-  .btn { cursor:pointer; }
-  .kpis { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.25rem; }
-  .kpis .k { background:#fafafa; border:1px solid #eee; border-radius:10px; padding:.35rem .6rem; font-size:.85rem; }
-  table.projects { width:100%; border-collapse:collapse; }
-  table.projects th, table.projects td { padding:.55rem; border-bottom:1px solid #f0f0f0; text-align:right; }
-  table.projects th { background:#fafafa; font-weight:600; }
-  .pagination { display:flex; gap:.4rem; align-items:center; margin-top:.8rem; }
-  .pagination a, .pagination span { border:1px solid #eee; padding:.25rem .5rem; border-radius:6px; text-decoration:none; color:#333; }
-  .pagination .active { background:#f7f7f7; }
-  .table-row { cursor:pointer; transition: background-color .15s ease, box-shadow .15s ease; }
-  .table-row:hover { background:#f6f9ff; }
-  .table-row:focus-within { background:#eef4ff; outline:0; box-shadow: inset 0 0 0 2px #d7e3ff; }
+  /* === فقط برای این صفحه (اسکوپ) === */
+  .p-manage .status-dot{display:inline-block;width:10px;height:10px;border-radius:999px;margin-left:.35rem;vertical-align:middle;border:1px solid transparent}
+  .p-manage .dot-draft{background:#bdbdbd;border-color:#bdbdbd}
+  .p-manage .dot-active{background:#0aa678;border-color:#0aa678}
+  .p-manage .dot-waiting{background:#f0ad00;border-color:#f0ad00}
+  .p-manage .dot-completed{background:#1e88e5;border-color:#1e88e5}
+  .p-manage .dot-cancelled{background:#d32f2f;border-color:#d32f2f}
 
-  /* نشان وضعیت در جدول */
-  .status-dot { display:inline-block; width:10px; height:10px; border-radius:999px; margin-left:.35rem; vertical-align:middle; border:1px solid transparent; }
-  .dot-draft     { background:#bdbdbd; border-color:#bdbdbd; }
-  .dot-active    { background:#0aa678; border-color:#0aa678; }
-  .dot-waiting   { background:#f0ad00; border-color:#f0ad00; }
-  .dot-completed { background:#1e88e5; border-color:#1e88e5; }
-  .dot-cancelled { background:#d32f2f; border-color:#d32f2f; }
-
-  .select-plain { border:none !important; background:transparent !important; padding:0 .2rem !important; outline:none !important; box-shadow:none !important; appearance:none; cursor:pointer; }
-  .select-plain:focus { outline:none; box-shadow:none; }
+  .p-manage .select-plain{
+    border:none !important;background:transparent !important;padding:0 .2rem !important;
+    outline:none !important;box-shadow:none !important;appearance:none;cursor:pointer;
+  }
 
   /* Drawer */
-  .drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,.15); display:none; z-index:999; }
-  .drawer { position:fixed; top:0; right:0; height:100vh; width:420px; max-width:92vw; background:#fff; box-shadow:-2px 0 12px rgba(0,0,0,.08); transform:translateX(100%); transition: transform .25s ease; z-index:1000; display:flex; flex-direction:column; }
-  .drawer.open { transform:translateX(0); }
-  .drawer-header { padding:.9rem 1rem; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
-  .drawer-body { padding:.9rem 1rem; overflow:auto; }
-  .muted { color:#666; font-size:.9rem; }
+  .p-manage .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.15);display:none;z-index:999}
+  .p-manage .drawer{
+    position:fixed;top:0;right:0;height:100vh;width:420px;max-width:92vw;background:#fff;
+    box-shadow:-2px 0 12px rgba(0,0,0,.08);transform:translateX(100%);transition:transform .25s ease;
+    z-index:1000;display:flex;flex-direction:column
+  }
+  .p-manage .drawer.open{transform:translateX(0)}
+  .p-manage .drawer-header{padding:.9rem 1rem;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+  .p-manage .drawer-body{padding:.9rem 1rem;overflow:auto}
+  .p-manage .muted{color:#666;font-size:.9rem}
 
   /* Badge وضعیت داخل Drawer */
-  .status { padding:.15rem .45rem; border-radius:999px; font-size:.8rem; border:1px solid transparent; }
-  .st-draft { color:#777; background:#f7f7f7; }
-  .st-active { color:#0a6; background:#e8fff5; }
-  .st-waiting { color:#a60; background:#fff6e6; }
-  .st-completed { color:#06c; background:#eaf4ff; }
-  .st-cancelled { color:#b00; background:#ffecec; }
+  .p-manage .status{padding:.15rem .45rem;border-radius:999px;font-size:.8rem;border:1px solid transparent}
+  .p-manage .st-draft{color:#777;background:#f7f7f7}
+  .p-manage .st-active{color:#0a6;background:#e8fff5}
+  .p-manage .st-waiting{color:#a60;background:#fff6e6}
+  .p-manage .st-completed{color:#06c;background:#eaf4ff}
+  .p-manage .st-cancelled{color:#b00;background:#ffecec}
 
   /* مأموریت‌ها در Drawer */
-  .missions-head { display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin:.6rem 0; }
-  .mchips { display:flex; gap:.4rem; flex-wrap:wrap; }
-  .mchip { background:#f7f7f7; border:1px solid #eee; border-radius:999px; padding:.15rem .5rem; font-size:.8rem; }
-  .mfilter { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; }
-  .mlist { display:flex; flex-direction:column; gap:.45rem; }
-  .mi { border:1px solid #f3f3f3; border-radius:10px; padding:.45rem .6rem; display:flex; align-items:center; justify-content:space-between; }
-  .mi .left { display:flex; align-items:center; gap:.5rem; min-width:0; }
-  .mi .ttl { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .mi .meta { color:#666; font-size:.85rem; }
-  .mdot { display:inline-block; width:10px; height:10px; border-radius:999px; border:1px solid transparent; }
-  .mdot-todo        { background:#bdbdbd; border-color:#bdbdbd; }
-  .mdot-in_progress { background:#1e88e5; border-color:#1e88e5; }
-  .mdot-done        { background:#0aa678; border-color:#0aa678; }
-  .mdot-cancelled   { background:#d32f2f; border-color:#d32f2f; }
-  .mi.overdue .ttl { color:#c62828; }
+  .p-manage .missions-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin:.6rem 0}
+  .p-manage .mchips{display:flex;gap:.4rem;flex-wrap:wrap}
+  .p-manage .mchip{background:#f7f7f7;border:1px solid #eee;border-radius:999px;padding:.15rem .5rem;font-size:.8rem}
+  .p-manage .mfilter{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+  .p-manage .mlist{display:flex;flex-direction:column;gap:.45rem}
+  .p-manage .mi{border:1px solid #f3f3f3;border-radius:10px;padding:.45rem .6rem;display:flex;align-items:center;justify-content:space-between}
+  .p-manage .mi .left{display:flex;align-items:center;gap:.5rem;min-width:0}
+  .p-manage .mi .ttl{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .p-manage .mi .meta{color:#666;font-size:.85rem}
+  .p-manage .mdot{display:inline-block;width:10px;height:10px;border-radius:999px;border:1px solid transparent}
+  .p-manage .mdot-todo{background:#bdbdbd;border-color:#bdbdbd}
+  .p-manage .mdot-in_progress{background:#1e88e5;border-color:#1e88e5}
+  .p-manage .mdot-done{background:#0aa678;border-color:#0aa678}
+  .p-manage .mdot-cancelled{background:#d32f2f;border-color:#d32f2f}
+  .p-manage .mi.overdue .ttl{color:#c62828}
+
+  /* دسته‌بندی مأموریت (Badge) */
+  .p-manage .mcat{display:inline-block;padding:.05rem .4rem;border-radius:999px;font-size:.75rem;border:1px solid transparent}
+  .p-manage .mcat-field{background:#eaf7ff;color:#036;border-color:#cfe8ff}
+  .p-manage .mcat-adm{background:#eafff4;color:#064;border-color:#c8f3e0}
+  .p-manage .mcat-desk{background:#fff6db;color:#7a5;border-color:#ffe9a3}
+  .p-manage .mcat-unk{background:#f5f5f5;color:#666;border-color:#eee}
 </style>
+{% endblock %}
 
-<!-- CSRF (در صورت وجود) -->
-<input type="hidden" id="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+{% block content %}
+<div class="p-manage">
 
-{# برچسب‌های فارسی وضعیت #}
-{% set STATUS_LABELS = {
-  'draft':'پیش نویس',
-  'active':'فعال',
-  'waiting':'درانتظار',
-  'completed':'اتمام',
-  'cancelled':'لغو'
-} %}
+  <!-- CSRF (در صورت وجود) -->
+  <input type="hidden" id="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
 
-<div class="controls">
-  <form method="get" class="left" id="filtersForm" action="{{ url_for('projects.manage_projects') }}">
-    <input class="textbox" type="text" name="q" value="{{ q }}" placeholder="جستجو (نام/هدف یا #ID)">
+  {# برچسب‌های فارسی وضعیت #}
+  {% set STATUS_LABELS = {
+    'draft':'پیش نویس',
+    'active':'فعال',
+    'waiting':'درانتظار',
+    'completed':'اتمام',
+    'cancelled':'لغو'
+  } %}
 
-    <select class="select" name="status">
-      <option value="">وضعیت: همه</option>
-      {% for s in ["draft","active","waiting","completed","cancelled"] %}
-        <option value="{{ s }}" {% if status_q==s %}selected{% endif %}>{{ STATUS_LABELS[s] }}</option>
-      {% endfor %}
-    </select>
+  <!-- نوار کنترل‌ها + KPI -->
+  <div class="flex items-center justify-between wrap gap-2 mb-2">
+    <form method="get" id="filtersForm" action="{{ url_for('projects.manage_projects') }}" class="flex items-center wrap gap-2">
+      <input class="input" type="text" name="q" value="{{ q }}" placeholder="جستجو (نام/هدف یا #ID)">
 
-    <select class="select" name="sort">
-      {% for s in ["id","client","created","status"] %}
-        <option value="{{ s }}" {% if sort==s %}selected{% endif %}>مرتب‌سازی: {{ s }}</option>
-      {% endfor %}
-    </select>
+      <select class="select" name="status">
+        <option value="">وضعیت: همه</option>
+        {% for s in ["draft","active","waiting","completed","cancelled"] %}
+          <option value="{{ s }}" {% if status_q==s %}selected{% endif %}>{{ STATUS_LABELS[s] }}</option>
+        {% endfor %}
+      </select>
 
-    <select class="select" name="order">
-      {% for s in ["desc","asc"] %}
-        <option value="{{ s }}" {% if order==s %}selected{% endif %}>ترتیب: {{ s }}</option>
-      {% endfor %}
-    </select>
+      <select class="select" name="sort">
+        {% for s in ["id","client","created","status"] %}
+          <option value="{{ s }}" {% if sort==s %}selected{% endif %}>مرتب‌سازی: {{ s }}</option>
+        {% endfor %}
+      </select>
 
-    <select class="select" name="per_page">
-      {% for p in [25,50,100] %}
-        <option value="{{ p }}" {% if per_page==p %}selected{% endif %}>در صفحه: {{ p }}</option>
-      {% endfor %}
-    </select>
+      <select class="select" name="order">
+        {% for s in ["desc","asc"] %}
+          <option value="{{ s }}" {% if order==s %}selected{% endif %}>ترتیب: {{ s }}</option>
+        {% endfor %}
+      </select>
 
-    <label style="display:flex;align-items:center;gap:.3rem;">
-      <input type="checkbox" name="group" value="1" {% if group %}checked{% endif %}>
-      گروه‌بندی وضعیت
-    </label>
+      <select class="select" name="per_page">
+        {% for p in [25,50,100] %}
+          <option value="{{ p }}" {% if per_page==p %}selected{% endif %}>در صفحه: {{ p }}</option>
+        {% endfor %}
+      </select>
 
-    <input type="hidden" name="page" value="{{ pagination.page if pagination is defined else 1 }}">
-    <button class="btn" type="submit">اعمال</button>
-  </form>
+      <label class="flex items-center gap-1">
+        <input type="checkbox" name="group" value="1" {% if group %}checked{% endif %}>
+        گروه‌بندی وضعیت
+      </label>
 
-  <div class="right">
-    <div class="kpis">
-      <div class="k">پیش نویس: {{ counters.draft }}</div>
-      <div class="k">فعال: {{ counters.active }}</div>
-      <div class="k">درانتظار: {{ counters.waiting }}</div>
-      <div class="k">اتمام: {{ counters.completed }}</div>
-      <div class="k">لغو: {{ counters.cancelled }}</div>
+      <input type="hidden" name="page" value="{{ pagination.page if pagination is defined else 1 }}">
+      <button class="btn btn-primary" type="submit">اعمال</button>
+    </form>
+
+    <div class="flex items-center gap-2 wrap">
+      <span class="chip">پیش نویس: {{ counters.draft }}</span>
+      <span class="chip">فعال: {{ counters.active }}</span>
+      <span class="chip">درانتظار: {{ counters.waiting }}</span>
+      <span class="chip">اتمام: {{ counters.completed }}</span>
+      <span class="chip">لغو: {{ counters.cancelled }}</span>
     </div>
   </div>
-</div>
 
-{% if group %}
-  {# گروه‌بندی بر اساس وضعیت #}
-  {% set statuses = ["active","waiting","draft","completed","cancelled"] %}
-  {% for st in statuses %}
-    <h3 style="margin-top:1rem;">{{ STATUS_LABELS[st] }}</h3>
-    <table class="projects">
+  {% if group %}
+    {# گروه‌بندی بر اساس وضعیت #}
+    {% set statuses = ["active","waiting","draft","completed","cancelled"] %}
+    {% for st in statuses %}
+      <h3 class="h2 mt-2">{{ STATUS_LABELS[st] }}</h3>
+      <table class="table row-hover projects">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>نام مشتری</th>
+            <th>هدف</th>
+            <th>تاریخ ایجاد</th>
+            <th>وضعیت</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in projects if p.status.name == st %}
+            <tr class="table-row"
+                data-id="{{ p.id }}"
+                data-client="{{ p.client_name }}"
+                data-goal="{{ p.goal }}"
+                data-status="{{ p.status.name }}"
+                data-status-label="{{ p.status.value }}"
+                data-created="{{ p.created_at | to_jalali | to_persian_number }}"
+                onclick="openRow(this)">
+              <td>{{ p.id }}</td>
+              <td>{{ p.client_name }}</td>
+              <td>{{ p.goal }}</td>
+              <td>{{ p.created_at | to_jalali | to_persian_number }}</td>
+              <td>
+                <span class="status-dot dot-{{ p.status.name }}" title="{{ p.status.value }}" aria-label="{{ p.status.value }}"></span>
+                <select onchange="updateStatus(event, {{ p.id }})"
+                        onclick="event.stopPropagation()"
+                        class="select-plain">
+                  {% for s in ["draft","active","waiting","completed","cancelled"] %}
+                    <option value="{{ s }}" {% if p.status.name==s %}selected{% endif %}>{{ STATUS_LABELS[s] }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="muted">خالی</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endfor %}
+  {% else %}
+    {# فهرست تخت #}
+    <table class="table row-hover projects">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>نام مشتری</th>
+          <th><a href="#" onclick="setSort('id');return false;">ID</a></th>
+          <th><a href="#" onclick="setSort('client');return false;">نام مشتری</a></th>
           <th>هدف</th>
-          <th>تاریخ ایجاد</th>
-          <th>وضعیت</th>
+          <th><a href="#" onclick="setSort('created');return false;">تاریخ ایجاد</a></th>
+          <th><a href="#" onclick="setSort('status');return false;">وضعیت</a></th>
         </tr>
       </thead>
       <tbody>
-        {% for p in projects if p.status.name == st %}
+        {% for p in projects %}
           <tr class="table-row"
               data-id="{{ p.id }}"
               data-client="{{ p.client_name }}"
@@ -166,136 +209,82 @@
               </select>
             </td>
           </tr>
-        {% else %}
-          <tr><td colspan="5" style="color:#777;">خالی</td></tr>
         {% endfor %}
       </tbody>
     </table>
-  {% endfor %}
-{% else %}
-  {# فهرست تخت #}
-  <table class="projects">
-    <thead>
-      <tr>
-        <th><a href="#" onclick="setSort('id');return false;">ID</a></th>
-        <th><a href="#" onclick="setSort('client');return false;">نام مشتری</a></th>
-        <th>هدف</th>
-        <th><a href="#" onclick="setSort('created');return false;">تاریخ ایجاد</a></th>
-        <th><a href="#" onclick="setSort('status');return false;">وضعیت</a></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for p in projects %}
-        <tr class="table-row"
-            data-id="{{ p.id }}"
-            data-client="{{ p.client_name }}"
-            data-goal="{{ p.goal }}"
-            data-status="{{ p.status.name }}"
-            data-status-label="{{ p.status.value }}"
-            data-created="{{ p.created_at | to_jalali | to_persian_number }}"
-            onclick="openRow(this)">
-          <td>{{ p.id }}</td>
-          <td>{{ p.client_name }}</td>
-          <td>{{ p.goal }}</td>
-          <td>{{ p.created_at | to_jalali | to_persian_number }}</td>
-          <td>
-            <span class="status-dot dot-{{ p.status.name }}" title="{{ p.status.value }}" aria-label="{{ p.status.value }}"></span>
-            <select onchange="updateStatus(event, {{ p.id }})"
-                    onclick="event.stopPropagation()"
-                    class="select-plain">
-              {% for s in ["draft","active","waiting","completed","cancelled"] %}
-                <option value="{{ s }}" {% if p.status.name==s %}selected{% endif %}>{{ STATUS_LABELS[s] }}</option>
-              {% endfor %}
-            </select>
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% endif %}
+  {% endif %}
 
-{% if pagination is defined %}
-  <div class="pagination">
-    {% if pagination.has_prev %}
-      <a href="#" onclick="setPage({{ pagination.prev_num }});return false;">← قبلی</a>
-    {% else %}
-      <span>← قبلی</span>
-    {% endif %}
+  {% if pagination is defined %}
+    <div class="flex items-center gap-2 mt-2">
+      {% if pagination.has_prev %}
+        <a href="#" class="btn btn-ghost" onclick="setPage({{ pagination.prev_num }});return false;">← قبلی</a>
+      {% else %}
+        <span class="btn btn-ghost">← قبلی</span>
+      {% endif %}
 
-    <span class="active">صفحه {{ pagination.page }} از {{ pagination.pages }}</span>
+      <span class="chip">صفحه {{ pagination.page }} از {{ pagination.pages }}</span>
 
-    {% if pagination.has_next %}
-      <a href="#" onclick="setPage({{ pagination.next_num }});return false;">بعدی →</a>
-    {% else %}
-      <span>بعدی →</span>
-    {% endif %}
-  </div>
-{% endif %}
-
-<!-- Drawer -->
-<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
-<aside class="drawer" id="drawer" aria-hidden="true">
-  <div class="drawer-header">
-    <div style="min-width:0;">
-      <div id="dTitle" style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
-      <div class="muted" id="dMeta"></div>
+      {% if pagination.has_next %}
+        <a href="#" class="btn btn-ghost" onclick="setPage({{ pagination.next_num }});return false;">بعدی →</a>
+      {% else %}
+        <span class="btn btn-ghost">بعدی →</span>
+      {% endif %}
     </div>
-    <div style="display:flex; align-items:center; gap:.4rem;">
-      <span class="status" id="dStatusBadge"></span>
-      <select class="select" id="dStatusSelect" onchange="updateStatusInDrawer(event)">
-        {% for s in ["draft","active","waiting","completed","cancelled"] %}
-          <option value="{{ s }}">{{ STATUS_LABELS[s] }}</option>
-        {% endfor %}
-      </select>
-      <button class="btn" onclick="closeDrawer()">✕</button>
-    </div>
-  </div>
-  <div class="drawer-body">
-    <div style="margin:.5rem 0;">
-      <a id="dFullLink" class="btn" href="#" target="_blank" rel="noopener">نمایش کامل ↗</a>
-    </div>
+  {% endif %}
 
-    <!-- ===== مأموریت‌ها ===== -->
-    <div class="missions-head">
-      <h3 style="margin:0;">ماموریت‌ها</h3>
-      <div class="mfilter">
-        <select id="mStatusFilter" class="select-plain" onchange="reloadMissions()">
-          <option value="">همه وضعیت‌ها</option>
-          <option value="todo">ثبت‌شده</option>
-          <option value="in_progress">در حال انجام</option>
-          <option value="done">انجام‌شده</option>
-          <option value="cancelled">لغو</option>
+  <!-- Drawer -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div style="min-width:0;">
+        <div id="dTitle" style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+        <div class="muted" id="dMeta"></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="status" id="dStatusBadge"></span>
+        <select class="select" id="dStatusSelect" onchange="updateStatusInDrawer(event)">
+          {% for s in ["draft","active","waiting","completed","cancelled"] %}
+            <option value="{{ s }}">{{ STATUS_LABELS[s] }}</option>
+          {% endfor %}
         </select>
-        <input id="mQuery" class="textbox" placeholder="جستجوی مأموریت…" onkeydown="if(event.key==='Enter') reloadMissions()">
+        <button class="btn" onclick="closeDrawer()">✕</button>
       </div>
     </div>
-    <div class="mchips" id="mCounters"></div>
-    <div class="mlist" id="mList">
-      <div class="muted">— در حال بارگذاری مأموریت‌ها…</div>
+    <div class="drawer-body">
+      <div class="mt-2">
+        <a id="dFullLink" class="btn" href="#" target="_blank" rel="noopener">نمایش کامل ↗</a>
+      </div>
+
+      <!-- ===== مأموریت‌ها ===== -->
+      <div class="missions-head">
+        <h3 class="h2" style="margin:0;">ماموریت‌ها</h3>
+        <div class="mfilter">
+          <select id="mStatusFilter" class="select-plain" onchange="reloadMissions()">
+            <option value="">همه وضعیت‌ها</option>
+            <option value="todo">ثبت‌شده</option>
+            <option value="in_progress">در حال انجام</option>
+            <option value="done">انجام‌شده</option>
+            <option value="cancelled">لغو</option>
+          </select>
+          <input id="mQuery" class="input" placeholder="جستجوی مأموریت…" onkeydown="if(event.key==='Enter') reloadMissions()">
+        </div>
+      </div>
+      <div class="mchips" id="mCounters"></div>
+      <div class="mlist" id="mList">
+        <div class="muted">— در حال بارگذاری مأموریت‌ها…</div>
+      </div>
     </div>
-  </div>
-</aside>
-<style>
-  .mcat { display:inline-block; padding:.05rem .4rem; border-radius:999px; font-size:.75rem; border:1px solid transparent; }
-  .mcat-field { background:#eaf7ff; color:#036; border-color:#cfe8ff; }
-  .mcat-adm   { background:#eafff4; color:#064; border-color:#c8f3e0; }
-  .mcat-desk  { background:#fff6db; color:#7a5; border-color:#ffe9a3; }
-  .mcat-unk   { background:#f5f5f5; color:#666; border-color:#eee; }
-</style>
+  </aside>
+
+</div> {# /p-manage #}
+
 <script>
-  const CAT_LABELS = {
-    field: 'میدانی',
-    administrative: 'اداری',
-    desk: 'دفتری',
-    unknown: 'نامشخص'
-  };
-  const CAT_CLASS = {
-    field: 'mcat-field',
-    administrative: 'mcat-adm',
-    desk: 'mcat-desk',
-    unknown: 'mcat-unk'
-  };
+  const CAT_LABELS = { field:'میدانی', administrative:'اداری', desk:'دفتری', unknown:'نامشخص' };
+  const CAT_CLASS  = { field:'mcat-field', administrative:'mcat-adm', desk:'mcat-desk', unknown:'mcat-unk' };
+  // اضافه: برای استفاده در title لیست مأموریت‌ها
+  const MISSION_LABELS = { todo:'ثبت‌شده', in_progress:'در حال انجام', done:'انجام‌شده', cancelled:'لغو' };
 </script>
+
 <script>
   function getCsrf(){ return document.getElementById('csrf_token')?.value || ''; }
 
@@ -523,7 +512,7 @@
     if (status) url.searchParams.set('status', status);
     if (q) url.searchParams.set('q', q);
     url.searchParams.set('limit', '50');
-    url.searchParams.set('with_category', '1'); // ← اضافه شد
+    url.searchParams.set('with_category', '1');
 
     fetch(url.toString(), { headers: { 'X-Requested-With':'XMLHttpRequest' }})
       .then(async (r) => {
@@ -556,47 +545,47 @@
   }
 
   function renderMissionList(items){
-  const el = document.getElementById('mList');
-  if (!items.length){
-    el.innerHTML = '<div class="muted">مأموریتی یافت نشد.</div>';
-    return;
-  }
-  const today = new Date().toISOString().slice(0,10);
+    const el = document.getElementById('mList');
+    if (!items.length){
+      el.innerHTML = '<div class="muted">مأموریتی یافت نشد.</div>';
+      return;
+    }
+    const today = new Date().toISOString().slice(0,10);
 
-  el.innerHTML = items.map(m => {
-    const code = (m.status || '').toLowerCase();
-    const label = m.status_label || (MISSION_LABELS[code] || code);
-    const dotMap = { todo:'mdot-todo', in_progress:'mdot-in_progress', done:'mdot-done', cancelled:'mdot-cancelled' };
-    const dot = dotMap[code] || 'mdot-todo';
-    const due = (m.due_date ? m.due_date.slice(0,10) : '—');
-    const overdue = (m.due_date && code !== 'done' && code !== 'cancelled' && m.due_date.slice(0,10) < today);
+    el.innerHTML = items.map(m => {
+      const code = (m.status || '').toLowerCase();
+      const label = m.status_label || (MISSION_LABELS[code] || code);
+      const dotMap = { todo:'mdot-todo', in_progress:'mdot-in_progress', done:'mdot-done', cancelled:'mdot-cancelled' };
+      const dot = dotMap[code] || 'mdot-todo';
+      const due = (m.due_date ? m.due_date.slice(0,10) : '—');
+      const overdue = (m.due_date && code !== 'done' && code !== 'cancelled' && m.due_date.slice(0,10) < today);
 
-    const cat = (m.category || 'unknown');
-    const catLbl = CAT_LABELS[cat] || 'نامشخص';
-    const catClass = CAT_CLASS[cat] || 'mcat-unk';
+      const cat = (m.category || 'unknown');
+      const catLbl = CAT_LABELS[cat] || 'نامشخص';
+      const catClass = CAT_CLASS[cat] || 'mcat-unk';
 
-    const tags = (m.tags && m.tags.length) ? ('#' + m.tags.join(' #')) : '';
+      const tags = (m.tags && m.tags.length) ? ('#' + m.tags.join(' #')) : '';
 
-    return `
-      <div class="mi ${overdue ? 'overdue' : ''}">
-        <div class="left" title="${label}">
-          <span class="mdot ${dot}"></span>
-          <div>
-            <div class="ttl">${escapeHtml(m.title || ('ماموریت #' + m.id))}</div>
-            <div class="meta">
-              <span class="mcat ${catClass}">${catLbl}</span>
-              &nbsp;· موعد: ${due}
-              ${tags ? ' · ' + escapeHtml(tags) : ''}
+      return `
+        <div class="mi ${overdue ? 'overdue' : ''}">
+          <div class="left" title="${label}">
+            <span class="mdot ${dot}"></span>
+            <div>
+              <div class="ttl">${escapeHtml(m.title || ('ماموریت #' + m.id))}</div>
+              <div class="meta">
+                <span class="mcat ${catClass}">${catLbl}</span>
+                &nbsp;· موعد: ${due}
+                ${tags ? ' · ' + escapeHtml(tags) : ''}
+              </div>
             </div>
           </div>
+          <div>
+            <a class="btn" href="/razmkar/${m.id}" target="_blank" rel="noopener">باز کردن ↗</a>
+          </div>
         </div>
-        <div>
-          <a class="btn" href="/razmkar/${m.id}" target="_blank" rel="noopener">باز کردن ↗</a>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
+      `;
+    }).join('');
+  }
 
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, ch =>
